@@ -34,7 +34,17 @@ rem ---- Wenta.Core.dll ----
   "%ROOT%Wenta.Core\Catalog.cs" ^
   "%ROOT%Wenta.Core\Bom.cs" ^
   "%ROOT%Wenta.Core\Balancing.cs" ^
-  "%ROOT%Wenta.Core\Room.cs"
+  "%ROOT%Wenta.Core\Room.cs" ^
+  "%ROOT%Wenta.Core\ReCorrections.cs" ^
+  "%ROOT%Wenta.Core\Standards.cs" ^
+  "%ROOT%Wenta.Core\Analysis.cs" ^
+  "%ROOT%Wenta.Core\Fabrication.cs" ^
+  "%ROOT%Wenta.Core\Development.cs" ^
+  "%ROOT%Wenta.Core\Clash.cs" ^
+  "%ROOT%Wenta.Core\Fan.cs" ^
+  "%ROOT%Wenta.Core\Insulation.cs" ^
+  "%ROOT%Wenta.Core\Sound.cs" ^
+  "%ROOT%Wenta.Core\Electrical.cs"
 if errorlevel 1 ( echo BUILD FAILED: Wenta.Core & exit /b 1 )
 
 rem ---- Wenta.Core.Tests.exe ----

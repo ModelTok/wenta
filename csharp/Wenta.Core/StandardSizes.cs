@@ -62,31 +62,33 @@ namespace Wenta
 
         /// <summary>Nearest EN 1506 nominal diameter [mm]. With roundUp=true
         /// (default) picks the smallest standard size ≥ diameter_mm; otherwise
-        /// the closest standard size in either direction.</summary>
+        /// the closest standard size in either direction (ties favour the
+        /// higher size — this method's long-standing, parity-tested
+        /// behaviour).</summary>
         public static int NearestRoundSize(double diameterMm, bool roundUp = true)
         {
-            int[] sizes = RoundDuctSizes;
-            int n = sizes.Length;
+            return NearestInTable(RoundDuctSizes, diameterMm, roundUp, tieFavorsLower: false);
+        }
+
+        /// <summary>Shared "nearest value in a small sorted table" scan used by
+        /// both <see cref="NearestRoundSize"/> and
+        /// <see cref="Standards.NearestRoundSizeFor"/>. <paramref name="tieFavorsLower"/>
+        /// lets each caller keep its own (already-tested) tie-breaking rule.</summary>
+        internal static int NearestInTable(int[] sizes, double value, bool roundUp, bool tieFavorsLower)
+        {
             int first = sizes[0];
-            int last = sizes[n - 1];
-            if (diameterMm <= first)
-                return first;
-            if (diameterMm >= last)
-                return last;
-            int idx = 0;
-            for (int i = 0; i < n; i++)
-            {
-                if (sizes[i] >= diameterMm)
-                {
-                    idx = i;
-                    break;
-                }
-            }
-            if (roundUp)
-                return sizes[idx];
-            // closest in either direction
-            int prev = sizes[idx - 1];
-            return (diameterMm - prev) < (sizes[idx] - diameterMm) ? prev : sizes[idx];
+            int last = sizes[sizes.Length - 1];
+            if (value <= first) return first;
+            if (value >= last) return last;
+
+            int idx = Array.FindIndex(sizes, s => s >= value);
+            int hi = sizes[idx];
+            if (roundUp || hi == value) return hi;
+
+            int lo = sizes[idx - 1];
+            double dHi = hi - value;
+            double dLo = value - lo;
+            return tieFavorsLower ? (dHi < dLo ? hi : lo) : (dLo < dHi ? lo : hi);
         }
     }
 }
