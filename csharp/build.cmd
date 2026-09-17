@@ -37,10 +37,14 @@ rem ---- Wenta.Core.dll ----
   "%ROOT%Wenta.Core\Room.cs" ^
   "%ROOT%Wenta.Core\ReCorrections.cs" ^
   "%ROOT%Wenta.Core\Standards.cs" ^
+  "%ROOT%Wenta.Core\Settings.cs" ^
+  "%ROOT%Wenta.Core\Results.cs" ^
   "%ROOT%Wenta.Core\Analysis.cs" ^
+  "%ROOT%Wenta.Core\Marking.cs" ^
   "%ROOT%Wenta.Core\Fabrication.cs" ^
   "%ROOT%Wenta.Core\Development.cs" ^
   "%ROOT%Wenta.Core\Clash.cs" ^
+  "%ROOT%Wenta.Core\Topology.cs" ^
   "%ROOT%Wenta.Core\Fan.cs" ^
   "%ROOT%Wenta.Core\Insulation.cs" ^
   "%ROOT%Wenta.Core\Sound.cs" ^
