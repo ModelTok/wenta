@@ -1,69 +1,77 @@
-# Wenta.Core — the C# port of the wenta library
+# Wenta.Core — the C# ductwork engineering library
 
 C# is the language of the CAD/BIM plugin stack (ZWCAD, AutoCAD, Revit are all
-.NET hosts). `Wenta.Core` is the complete port of the `wenta` ductwork
-library — sizing, friction, fittings, network solver, catalogs, BOM —
-dependency-free, compiled with the bare-csc toolchain, loadable in ZWCAD.
+.NET hosts). `Wenta.Core` is the complete, dependency-free ductwork design
+library — sizing, friction, fittings, network solver, catalogs, BOM, and the
+Phase-4 engineering modules (sound, balancing, fans, insulation, rooms,
+fabrication, clash, topology) — compiled with the bare-csc toolchain and
+loadable in ZWCAD as a single DLL.
 
-`python/wenta` + `wentamojo` remain the **math oracle** (unchanged); this
-port is verified against it by parity vectors.
+It began as a port of the Python `wenta` reference, its Mojo port and the
+Rust `venti` library. Those three implementations were removed from the
+repository in the C#-only migration (GitHub issue #64); their last state is
+tagged `legacy-py-mojo-rust` in git history. **Wenta.Core is now the source
+of truth.**
 
 ## Layout
 
 ```
-Wenta.Core/           pure C# port (compiles standalone, net48-compatible)
-  Units.cs Fluid.cs Geometry.cs Physics.cs StandardSizes.cs
-  FittingsLibrary.cs Elbow.cs Components.cs Network.cs Solver.cs
-  Sizing.cs Catalog.cs Bom.cs
-Wenta.Core.Tests/     console parity runner (Program.cs, no xUnit needed)
-vectors/             CSV parity vectors (generated, see below)
-tools/gen_vectors.py vector generator (transcribes the wentamojo kernels)
-tools/.venv          scipy for the ElbowRound spline ground truth
-catalogs/            example-generic.json — open zeta-catalog format
-build.cmd            builds core + tests, copies vectors
+Wenta.Core/           pure C# library (compiles standalone, net48-compatible)
+  Units.cs Fluid.cs Geometry.cs Physics.cs StandardSizes.cs Standards.cs
+  FittingsLibrary.cs Elbow.cs ReCorrections.cs Components.cs Network.cs
+  Solver.cs Sizing.cs Catalog.cs Bom.cs Results.cs Analysis.cs Marking.cs
+  Balancing.cs Room.cs Sound.cs Fan.cs Insulation.cs Electrical.cs
+  Fabrication.cs Development.cs Clash.cs Topology.cs Settings.cs
+Wenta.Core.Tests/     console test runner (Program.cs, no xUnit needed)
+  vectors/            CSV parity vectors (frozen golden fixtures, see below)
+catalogs/             example-generic.json — open zeta-catalog format
+build.cmd             builds core + tests, copies vectors
 ```
 
-## Build & parity
+## Build & test
 
 ```cmd
 build.cmd
-bin\Wenta.Core.Tests.exe        # => "==== 551 passed, 0 failed ===="
+bin\Wenta.Core.Tests.exe        # => "==== N passed, 0 failed ===="
 ```
 
-Regenerate vectors (after changing wentamojo/wenta math):
+or `just csharp-parity` from the repo root. `build.cmd` uses the VS 2022
+Build Tools `csc.exe` and falls back to `vswhere` for any other VS 2022
+edition (that is how `.github/workflows/csharp.yml` runs it on
+`windows-latest`).
 
-```cmd
-cd tools
-.venv\Scripts\python.exe gen_vectors.py
-```
+## What the tests are
 
-## How the vectors stay honest
+Two kinds of assertions, both in `Wenta.Core.Tests/Program.cs`:
 
-- The Windows dev box **cannot run the oracle** — `mojo==0.26.2` ships no
-  Windows wheels, and wenta's Python math is a shim over it. The generator
-  therefore transcribes the canonical formula source (`wentamojo`, which is
-  itself parity-tested against `python/wenta` on Linux/CI) and spot-anchors
-  to `python/tests` expectations. The elbow spline ground truth is scipy
-  (`RectBivariateSpline`), which is exactly what `wenta.components.elbow`
-  uses in Python — it runs natively on Windows.
-- Tolerances: 1e-12 relative everywhere; elbow grid points 1e-9 (spline
-  passes through knots), elbow intermediate points 2e-4 (separable
-  not-a-knot bicubic vs FITPACK).
-- Full Python-oracle vector generation should run on **CI (Linux)** where
-  mojo wheels exist — `gen_vectors.py` then becomes a thin `import wenta`
-  instead of transcriptions (same CSV schema).
+- **Parity vectors** (`vectors/*.csv`) — units, fluid, geometry, friction,
+  losses, flex, EN sizes, fittings, elbow spline, sizing and solver. They
+  were generated from the Python/Mojo oracle while it still lived in this
+  repository (see the `legacy-py-mojo-rust` tag; the generator was
+  `csharp/tools/gen_vectors.py`). They are now frozen golden fixtures: a
+  change that alters them is a deliberate behaviour change, not a
+  regeneration. Tolerances: 1e-12 relative everywhere; elbow grid points
+  1e-9, elbow intermediate points 2e-4 (separable not-a-knot bicubic vs
+  FITPACK).
+- **Closed-form regression tests** — catalog, BOM, balancing, room, and
+  every module ported from `venti` (standards, Re/size corrections,
+  settings, results, analysis, marking, fabrication, development, clash,
+  topology, fan, insulation, sound, electrical). These were transcribed
+  from the Rust modules' inline unit tests before the Rust tree was
+  removed, with the same tolerances.
 
-## Beyond the wenta reference surface
-
-Two competitive-scope modules land here first:
+## Beyond the reference surface
 
 - **`Catalog.cs`** — the open ζ-catalog format (JSON): pluggable
   manufacturer loss tables with provenance and KNR codes, vendor-mergeable.
-  The open answer to Wentyle's sponsored libraries / Ventpack's PartShelf24.
-- **`Bom.cs`** — bill of materials with KNR-ready rows from a solved
-  network (lengths, areas, per-item KNR estimate codes).
+- **`Bom.cs`** — bill of materials with KNR-ready rows from a solved network.
+- **`Standards.cs`** — selectable EN 1505/1506, ASHRAE/SMACNA and DIN 24155
+  size tables (`Standard` enum) on top of the canonical EN tables in
+  `StandardSizes.cs`.
+- **`Topology.cs`** — trace 2D polylines into a `Network` (tee detection at
+  shared vertices) and flatten a network back to draw segments; the
+  library half of the WENTATRACE command.
 
-The `venti` (Rust) sibling implements a wider feature set (sound,
-balancing, fans, insulation, rooms, fabrication) — port those here
-module-by-module with the same vector methodology (see
-`zwcad-plugin/ROADMAP.md`, Phase 4).
+The ZWCAD plugin (`../zwcad-plugin`) compiles every file in `Wenta.Core/`
+into its own DLL — keep `zwcad-plugin/build.cmd`'s file list in sync with
+`build.cmd` when adding a module.

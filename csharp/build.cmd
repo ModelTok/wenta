@@ -7,6 +7,13 @@ rem ------------------------------------------------------------------
 setlocal
 
 set CSC="C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\Roslyn\csc.exe"
+rem Any VS 2022 edition (CI runners ship Enterprise, not BuildTools).
+rem (no if-block here: the ")" in "Program Files (x86)" would close it.)
+set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+if exist %CSC% goto :csc_found
+for /f "usebackq delims=" %%i in (`"%VSWHERE%" -latest -products * -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\Roslyn\csc.exe`) do set CSC="%%i"
+:csc_found
+if not exist %CSC% ( echo csc.exe not found - install VS 2022 Build Tools & exit /b 1 )
 set FW=C:\Windows\Microsoft.NET\Framework64\v4.0.30319
 set ROOT=%~dp0
 set OUT=%ROOT%bin

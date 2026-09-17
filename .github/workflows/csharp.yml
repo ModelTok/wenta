@@ -1,0 +1,26 @@
+name: csharp
+
+on:
+  push:
+    paths:
+      - 'csharp/**'
+      - '.github/workflows/csharp.yml'
+  pull_request:
+    paths:
+      - 'csharp/**'
+
+jobs:
+  parity:
+    name: Wenta.Core build + parity/regression suite
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # build.cmd locates csc.exe via vswhere when the BuildTools path is absent.
+      - name: Build Wenta.Core + test runner
+        shell: cmd
+        run: csharp\build.cmd
+
+      - name: Run parity vectors + closed-form regression tests
+        shell: cmd
+        run: csharp\bin\Wenta.Core.Tests.exe
