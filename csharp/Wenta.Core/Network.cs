@@ -93,6 +93,7 @@ namespace Wenta
         }
 
         public List<string> Predecessors(string nodeId) { return _pred[nodeId]; }
+        public List<string> Successors(string nodeId) { return _succ[nodeId]; }
 
         public IList<Terminal> Terminals()
         {

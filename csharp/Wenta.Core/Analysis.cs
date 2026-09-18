@@ -36,7 +36,7 @@ namespace Wenta
         /// <summary>One <see cref="BranchInfo"/> per duct component.</summary>
         public List<BranchInfo> Branches = new List<BranchInfo>();
         /// <summary>The number of duct branches (equal to Branches.Count).</summary>
-        public int NBranches;
+        public int NBranches { get { return Branches.Count; } }
     }
 
     /// <summary>Per-branch analysis report: combine the pressure-drop network
@@ -53,14 +53,18 @@ namespace Wenta
         /// <summary>Analyze a network and produce a per-branch sound +
         /// balancing report.
         ///
-        /// Unlike the Rust `analyze`, which clones the network internally so
-        /// the caller's graph is left untouched, this port solves
-        /// <paramref name="network"/> in place (matching this codebase's
-        /// existing convention — see <see cref="Bom.Build"/> — where the
-        /// caller is expected to hand over a network that is solved, or about
-        /// to be solved, as part of the same call). Callers that need the
-        /// original network preserved should build a fresh copy before
-        /// calling this method.
+        /// This method SOLVES <paramref name="network"/> in place: it calls
+        /// <see cref="Network.Solve"/>, which mutates every port's flowrate,
+        /// velocity and pressure drop. That differs from the Rust `analyze`
+        /// (which clones the network) and from <see cref="Bom.Build"/>,
+        /// <see cref="Results.ExtractResults"/> and
+        /// <see cref="Marking.AssignBranchMarks"/>, which are read-only over a
+        /// network the caller has already solved. Pass a freshly built
+        /// network: <see cref="Solver.PropagateFlowrates"/> resets the
+        /// port-node flows but not the component-node accumulators, so
+        /// re-solving an already-solved network is not guaranteed to
+        /// reproduce the first solve. Callers that need the original network
+        /// preserved should build a fresh copy before calling this method.
         ///
         /// For every RigidDuct/FlexDuct branch:
         /// * FlowM3s — the inlet-port flowrate after the solve.
@@ -110,8 +114,7 @@ namespace Wenta
                 }
                 else if (flex != null)
                 {
-                    double r = flex.Diameter * 0.5;
-                    area = Math.PI * r * r;
+                    area = flex.Area;
                     diameter = flex.Diameter;
                     kind = "FlexDuct";
                 }
@@ -121,30 +124,21 @@ namespace Wenta
                     continue;
                 }
 
-                // Inlet flow from the component's inlet port.
-                double flowM3s = 0.0;
-                foreach (Port p in c.Inlets)
-                {
-                    if (p.Flowrate != null) flowM3s = p.Flowrate.Value;
-                    break;
-                }
+                // Inlet flow from the component's inlet port (0 when unset).
+                double flowM3s = c.InletFlowrate() ?? 0.0;
 
                 double velocityMs = flowM3s / area;
 
                 // Total pressure drop across all ports.
-                double pressureDropPa = 0.0;
-                foreach (Port p in c.Ports) pressureDropPa += p.PressureDrop;
+                double pressureDropPa = c.TotalPressureDrop();
 
-                // Regenerated noise: velocity>0 and diameter>0 required, else null.
-                double? regeneratedNoiseDb;
-                try
-                {
-                    regeneratedNoiseDb = Sound.RegeneratedNoiseRound(velocityMs, diameter, fluid.Density);
-                }
-                catch (WentaException)
-                {
-                    regeneratedNoiseDb = null;
-                }
+                // Regenerated noise: the correlation rejects velocity <= 0,
+                // diameter <= 0 and density <= 0, so report null there instead
+                // (NaN inputs pass through to the correlation, as before).
+                double? regeneratedNoiseDb =
+                    !(velocityMs <= 0.0) && !(diameter <= 0.0) && !(fluid.Density <= 0.0)
+                        ? (double?)Sound.RegeneratedNoiseRound(velocityMs, diameter, fluid.Density)
+                        : null;
 
                 // Balancing zeta: use the component's own drop as the
                 // available-pressure proxy (documented above). Null when the
@@ -169,7 +163,6 @@ namespace Wenta
             {
                 CriticalDpPa = criticalDpPa,
                 Branches = branches,
-                NBranches = branches.Count,
             };
         }
     }

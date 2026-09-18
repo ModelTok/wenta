@@ -33,19 +33,7 @@ namespace Wenta
         {
             if (lengthM < 0.0)
                 throw new WentaException("length must be non-negative");
-
-            double perimeter;
-            Round round = crossSection as Round;
-            if (round != null)
-            {
-                perimeter = Math.PI * round.Diameter;
-            }
-            else
-            {
-                Rectangular rect = (Rectangular)crossSection;
-                perimeter = 2.0 * (rect.Width + rect.Height);
-            }
-            return perimeter * lengthM;
+            return crossSection.Perimeter * lengthM;
         }
 
         /// <summary>Weight [kg] of fabricated sheet metal for a given surface area,
@@ -104,17 +92,21 @@ namespace Wenta
         public static List<KeyValuePair<string, double>> CuttingSchedule(
             IEnumerable<KeyValuePair<string, double>> ducts)
         {
-            var totals = new SortedDictionary<string, double>(StringComparer.Ordinal);
+            var totals = new Dictionary<string, double>();
             foreach (KeyValuePair<string, double> duct in ducts)
             {
                 double existing;
-                double current = totals.TryGetValue(duct.Key, out existing) ? existing : 0.0;
-                totals[duct.Key] = current + duct.Value;
+                totals.TryGetValue(duct.Key, out existing); // 0.0 when absent
+                totals[duct.Key] = existing + duct.Value;
             }
 
-            var result = new List<KeyValuePair<string, double>>(totals.Count);
-            foreach (KeyValuePair<string, double> kv in totals)
-                result.Add(kv);
+            // Ordinal key order (the BTreeMap order of the Rust original).
+            var keys = new List<string>(totals.Keys);
+            keys.Sort(string.CompareOrdinal);
+
+            var result = new List<KeyValuePair<string, double>>(keys.Count);
+            foreach (string k in keys)
+                result.Add(new KeyValuePair<string, double>(k, totals[k]));
             return result;
         }
     }

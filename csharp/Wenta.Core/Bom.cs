@@ -86,7 +86,7 @@ namespace Wenta
                     row.Description = "flex D=" + (fd.Diameter * 1000) + "mm";
                     row.Length = fd.Length;
                     // flex is round: surface area = π·(D/2)²·L (matches venti bom.rs)
-                    row.Area = Math.PI * (fd.Diameter / 2.0) * (fd.Diameter / 2.0) * fd.Length;
+                    row.Area = fd.Area * fd.Length;
                 }
                 else if (c is Terminal)
                 {

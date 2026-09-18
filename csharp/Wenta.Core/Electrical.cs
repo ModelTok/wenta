@@ -143,29 +143,18 @@ namespace Wenta
             sb.Append("component_id,device_type,power_w,power_kw,voltage_v,current_a,power_factor,frequency_hz");
             foreach (ElectricalData e in schedule.Iter())
             {
-                string current;
-                if (e.CurrentA.HasValue)
-                {
-                    current = FmtNum(e.CurrentA.Value);
-                }
-                else
-                {
-                    double? c = e.ComputedCurrent();
-                    current = c.HasValue ? FmtNum(c.Value) : "";
-                }
-                string voltage = e.VoltageV.HasValue ? FmtNum(e.VoltageV.Value) : "";
-                string powerFactor = e.PowerFactor.HasValue ? FmtNum(e.PowerFactor.Value) : "";
-                string frequency = e.FrequencyHz.HasValue ? FmtNum(e.FrequencyHz.Value) : "";
+                // stored current when present, else the computable one (or empty)
+                double? current = e.CurrentA ?? e.ComputedCurrent();
 
                 sb.Append('\n');
                 sb.Append(e.ComponentId).Append(',')
                   .Append(e.DeviceType).Append(',')
                   .Append(FmtNum(e.PowerW)).Append(',')
                   .Append(FmtNum(e.PowerKw())).Append(',')
-                  .Append(voltage).Append(',')
-                  .Append(current).Append(',')
-                  .Append(powerFactor).Append(',')
-                  .Append(frequency);
+                  .Append(Results.FmtOpt(e.VoltageV)).Append(',')
+                  .Append(Results.FmtOpt(current)).Append(',')
+                  .Append(Results.FmtOpt(e.PowerFactor)).Append(',')
+                  .Append(Results.FmtOpt(e.FrequencyHz));
             }
             return sb.ToString();
         }

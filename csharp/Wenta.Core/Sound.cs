@@ -132,8 +132,7 @@ namespace Wenta
         /// mapping (parallel to <see cref="Sizing.NoiseLimitsMs"/>).</summary>
         public static bool NcOk(string spaceType, double levelDb)
         {
-            double limit = NcLimit(spaceType);
-            return levelDb <= limit + 1e-9;
+            return NcOkTarget(NcLimit(spaceType), levelDb);
         }
 
         /// <summary>Check a computed sound level against an explicit numeric

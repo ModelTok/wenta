@@ -127,25 +127,33 @@ namespace Wenta
             double innerHtc, double outerHtc)
         {
             Validate(ductOuterDiameterM, conductivity, innerHtc, outerHtc);
-            // Already condensation-safe at t = 0?
-            if (SurfaceTemp(airTempC, ambientTempC, conductivity, ductOuterDiameterM, 0.0,
-                innerHtc, outerHtc) >= dewPointC)
-            {
+            // Grow thickness until the outer surface is at/above the dew point.
+            return SmallestThickness(
+                delegate (double t)
+                {
+                    return SurfaceTemp(airTempC, ambientTempC, conductivity, ductOuterDiameterM, t,
+                        innerHtc, outerHtc) >= dewPointC;
+                },
+                "dew point cannot be reached within the maximum considered thickness");
+        }
+
+        /// <summary>Smallest thickness [m] satisfying <paramref name="ok"/>:
+        /// 0 if already satisfied bare, else grown in 1 mm steps up to
+        /// <see cref="MaxThicknessM"/>; throws <paramref name="failMessage"/>
+        /// when no step within the limit satisfies it.</summary>
+        private static double SmallestThickness(Func<double, bool> ok, string failMessage)
+        {
+            if (ok(0.0))
                 return 0.0;
-            }
-            // Grow thickness until the surface warms above the dew point.
             const double step = 0.001; // 1 mm
             double t = 0.0;
             while (t <= MaxThicknessM)
             {
                 t += step;
-                if (SurfaceTemp(airTempC, ambientTempC, conductivity, ductOuterDiameterM, t,
-                    innerHtc, outerHtc) >= dewPointC)
-                {
+                if (ok(t))
                     return t;
-                }
             }
-            throw new WentaException("dew point cannot be reached within the maximum considered thickness");
+            throw new WentaException(failMessage);
         }
 
         /// <summary>Smallest insulation thickness [m] so the per-metre heat
@@ -161,21 +169,13 @@ namespace Wenta
             Validate(ductOuterDiameterM, conductivity, innerHtc, outerHtc);
             if (targetWPerM <= 0.0)
                 throw new WentaException("target_w_per_m must be positive");
-            double atZero = Math.Abs(HeatFlow(airTempC, ambientTempC, conductivity,
-                ductOuterDiameterM, 0.0, innerHtc, outerHtc));
-            if (atZero <= targetWPerM)
-                return 0.0;
-            const double step = 0.001;
-            double t = 0.0;
-            while (t <= MaxThicknessM)
-            {
-                t += step;
-                double q = Math.Abs(HeatFlow(airTempC, ambientTempC, conductivity,
-                    ductOuterDiameterM, t, innerHtc, outerHtc));
-                if (q <= targetWPerM)
-                    return t;
-            }
-            throw new WentaException("heat-loss target cannot be met within the maximum considered thickness");
+            return SmallestThickness(
+                delegate (double t)
+                {
+                    return Math.Abs(HeatFlow(airTempC, ambientTempC, conductivity,
+                        ductOuterDiameterM, t, innerHtc, outerHtc)) <= targetWPerM;
+                },
+                "heat-loss target cannot be met within the maximum considered thickness");
         }
 
         /// <summary>Per-metre heat transfer [W/m] through insulation of

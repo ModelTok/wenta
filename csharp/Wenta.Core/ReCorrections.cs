@@ -25,7 +25,8 @@ namespace Wenta
         /// <summary>Nominal duct size [m] of the reference test point (200 mm).</summary>
         public const double DRefM = 0.200;
 
-        private static double Clamp(double v, double lo, double hi)
+        /// <summary>Clamp <paramref name="v"/> to [lo, hi] (NaN passes through).</summary>
+        internal static double Clamp(double v, double lo, double hi)
         {
             return Math.Max(lo, Math.Min(hi, v));
         }

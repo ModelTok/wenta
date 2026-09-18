@@ -48,18 +48,41 @@ namespace Wenta
         {
             get { foreach (Port p in Ports) if (!p.IsIn) yield return p; }
         }
+
+        /// <summary>Flowrate [m^3/s] on the component's first inlet port;
+        /// null when the component has no inlet port or the port's flowrate
+        /// has not been set (network not yet solved).</summary>
+        public double? InletFlowrate()
+        {
+            foreach (Port p in Inlets)
+                return p.Flowrate;
+            return null;
+        }
+
+        /// <summary>Total pressure drop [Pa] across all of the component's
+        /// ports (sum of <see cref="Port.PressureDrop"/>).</summary>
+        public double TotalPressureDrop()
+        {
+            double total = 0.0;
+            foreach (Port p in Ports) total += p.PressureDrop;
+            return total;
+        }
     }
 
     /// <summary>A rigid (sheet-metal) straight duct. Full Darcy–Weisbach drop
     /// is reported on the inlet port; the outlet carries 0.</summary>
     public sealed class RigidDuct : Component
     {
+        /// <summary>Default absolute wall roughness [m] for galvanised sheet
+        /// steel (0.1 mm).</summary>
+        public const double DefaultAbsoluteRoughness = 0.0001;
+
         public readonly CrossSection CrossSection;
         public readonly double Length;
         public readonly double AbsoluteRoughness;
 
         public RigidDuct(string name, CrossSection crossSection, double length,
-                         double absoluteRoughness = 0.0001)
+                         double absoluteRoughness = DefaultAbsoluteRoughness)
             : base(name)
         {
             if (length <= 0.0)
@@ -98,6 +121,8 @@ namespace Wenta
         public readonly double Length;
         public readonly double PressureDropPerMeter;
         public readonly double StretchPercentage;
+        /// <summary>Cross-section area [m^2] = π·(D/2)², computed once.</summary>
+        public readonly double Area;
 
         public FlexDuct(string name, double diameter, double length,
                         double pressureDropPerMeter, double stretchPercentage = 100.0)
@@ -112,6 +137,7 @@ namespace Wenta
             Length = length;
             PressureDropPerMeter = pressureDropPerMeter;
             StretchPercentage = stretchPercentage;
+            Area = Math.PI * (Diameter / 2.0) * (Diameter / 2.0);
             Ports.Add(new Port("inlet", true));
             Ports.Add(new Port("outlet", false));
         }
@@ -121,8 +147,7 @@ namespace Wenta
             Port inlet = Ports[0], outlet = Ports[1];
             if (inlet.Flowrate == null)
                 throw new WentaException("FlexDuct '" + Name + "': inlet flowrate not set");
-            double area = Math.PI * (Diameter / 2.0) * (Diameter / 2.0);
-            double v = inlet.Flowrate.Value / area;
+            double v = inlet.Flowrate.Value / Area;
             double beta = Flex.StretchCorrectionFactor(Diameter, StretchPercentage);
             inlet.Velocity = v;
             outlet.Velocity = v;

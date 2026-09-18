@@ -45,12 +45,8 @@ namespace Wenta
         /// Neighbours discovered at the same step are sorted and de-duplicated
         /// so the numbering is stable regardless of iteration order over the
         /// network's internal collections. Returns an empty list for an empty
-        /// network.
-        ///
-        /// <paramref name="network"/>'s successors are derived from the
-        /// public <see cref="Network.Predecessors"/> adjacency (there is no
-        /// public forward-adjacency accessor), inverted once up front so the
-        /// BFS itself runs in linear time.
+        /// network. Downstream neighbours are read through
+        /// <see cref="Network.Successors"/>.
         ///
         /// <c>SizeMm</c> is the duct's hydraulic diameter expressed in
         /// millimetres and rounded to the nearest integer millimetre. It is
@@ -67,11 +63,6 @@ namespace Wenta
             var marks = new List<Mark>();
             if (network.Components.Count == 0)
                 return marks;
-
-            // Forward adjacency (node id -> successor node ids), built once
-            // from the public Predecessors accessor since Network does not
-            // expose a public Successors map.
-            var succ = BuildSuccessors(network);
 
             // Deterministic BFS seed: source component ids, sorted.
             var seeds = new List<string>();
@@ -100,38 +91,28 @@ namespace Wenta
                         ComponentId = cid,
                         Kind = component.GetType().Name,
                         SizeMm = Math.Round(duct.CrossSection.HydraulicDiameter * 1000.0),
-                        FlowM3s = InletFlow(component),
+                        FlowM3s = component.InletFlowrate(),
                     });
                     nextBranch++;
                 }
 
                 // Discover downstream components through this component's
-                // outlet ports.
-                var downstream = new List<string>();
+                // outlet ports; sorted + de-duplicated so the numbering does
+                // not depend on adjacency-list order.
+                var downstream = new SortedSet<string>(StringComparer.Ordinal);
                 foreach (Port port in component.Outlets)
                 {
-                    string pid = Network.PortNodeId(cid, port.Name);
-                    List<string> neighbours;
-                    if (succ.TryGetValue(pid, out neighbours))
+                    foreach (string node in network.Successors(port.NodeId))
                     {
-                        foreach (string node in neighbours)
-                        {
-                            int colon = node.IndexOf(':');
-                            if (colon < 0) continue;
-                            string ncid = node.Substring(0, colon);
-                            if (ncid != cid && !visited.Contains(ncid))
-                                downstream.Add(ncid);
-                        }
+                        int colon = node.IndexOf(':');
+                        if (colon < 0) continue;
+                        string ncid = node.Substring(0, colon);
+                        if (ncid != cid && !visited.Contains(ncid))
+                            downstream.Add(ncid);
                     }
                 }
-                downstream.Sort(StringComparer.Ordinal);
-                string prev = null;
                 foreach (string ncid in downstream)
-                {
-                    if (ncid == prev) continue; // de-duplicate consecutive
-                    prev = ncid;
                     queue.Enqueue(ncid);
-                }
             }
 
             return marks;
@@ -149,56 +130,11 @@ namespace Wenta
                     m.BranchNo.ToString(CultureInfo.InvariantCulture),
                     m.ComponentId,
                     m.Kind,
-                    FmtOpt(m.SizeMm),
-                    FmtOpt(m.FlowM3s),
+                    Results.FmtOpt(m.SizeMm),
+                    Results.FmtOpt(m.FlowM3s),
                 }));
             }
             return string.Join("\n", lines.ToArray());
-        }
-
-        /// <summary>Flowrate on the component's first inlet port, if the
-        /// network was solved.</summary>
-        private static double? InletFlow(Component component)
-        {
-            foreach (Port p in component.Inlets)
-                return p.Flowrate;
-            return null;
-        }
-
-        /// <summary>Format an optional double (empty string for null).</summary>
-        private static string FmtOpt(double? v)
-        {
-            return v.HasValue ? v.Value.ToString(CultureInfo.InvariantCulture) : "";
-        }
-
-        /// <summary>Invert <see cref="Network.Predecessors"/> over every node
-        /// in the network (components and ports alike) into a forward
-        /// adjacency map, mirroring the Rust `Network::successors`.</summary>
-        private static Dictionary<string, List<string>> BuildSuccessors(Network network)
-        {
-            var succ = new Dictionary<string, List<string>>();
-            foreach (var kv in network.Components)
-            {
-                AddSuccessorsFor(network, kv.Key, succ);
-                foreach (Port p in kv.Value.Ports)
-                    AddSuccessorsFor(network, p.NodeId, succ);
-            }
-            return succ;
-        }
-
-        private static void AddSuccessorsFor(Network network, string nodeId,
-            Dictionary<string, List<string>> succ)
-        {
-            foreach (string pred in network.Predecessors(nodeId))
-            {
-                List<string> list;
-                if (!succ.TryGetValue(pred, out list))
-                {
-                    list = new List<string>();
-                    succ[pred] = list;
-                }
-                list.Add(nodeId);
-            }
         }
     }
 }

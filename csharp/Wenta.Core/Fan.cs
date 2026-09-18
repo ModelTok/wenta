@@ -98,7 +98,8 @@ namespace Wenta
             throw new WentaException("fan '" + Name + "': no segment brackets flow " + flowM3s + " m3/s");
         }
 
-        private static bool IsFinite(double v)
+        /// <summary>True when <paramref name="v"/> is neither NaN nor infinite.</summary>
+        internal static bool IsFinite(double v)
         {
             return !double.IsNaN(v) && !double.IsInfinity(v);
         }
@@ -119,9 +120,8 @@ namespace Wenta
         /// non-finite.</summary>
         public static double Power(double flowM3s, double pressurePa, double efficiency)
         {
-            if (double.IsNaN(flowM3s) || double.IsInfinity(flowM3s)
-                || double.IsNaN(pressurePa) || double.IsInfinity(pressurePa)
-                || double.IsNaN(efficiency) || double.IsInfinity(efficiency))
+            if (!FanCurve.IsFinite(flowM3s) || !FanCurve.IsFinite(pressurePa)
+                || !FanCurve.IsFinite(efficiency))
                 throw new WentaException("fan_power: flow, pressure and efficiency must be finite");
             if (flowM3s < 0.0)
                 throw new WentaException("fan_power: flow must be >= 0 m3/s, got " + flowM3s);
@@ -146,21 +146,17 @@ namespace Wenta
         /// or <paramref name="requiredStaticPa"/>.</summary>
         public static double? Margin(FanCurve fan, double designFlowM3s, double requiredStaticPa)
         {
-            if (double.IsNaN(designFlowM3s) || double.IsInfinity(designFlowM3s) || designFlowM3s < 0.0)
+            if (!FanCurve.IsFinite(designFlowM3s) || designFlowM3s < 0.0)
                 throw new WentaException("margin_pa: design flow must be a finite value >= 0 m3/s, got "
                     + designFlowM3s);
-            if (double.IsNaN(requiredStaticPa) || double.IsInfinity(requiredStaticPa) || requiredStaticPa < 0.0)
+            if (!FanCurve.IsFinite(requiredStaticPa) || requiredStaticPa < 0.0)
                 throw new WentaException("margin_pa: required pressure must be a finite value >= 0 Pa, got "
                     + requiredStaticPa);
-            try
-            {
-                double curvePressure = fan.StaticPressureAt(designFlowM3s);
-                return curvePressure - requiredStaticPa;
-            }
-            catch (WentaException)
-            {
+            // Outside the tabulated range the curve is undefined -> no margin.
+            if (designFlowM3s < fan.Points[0].FlowM3s
+                || designFlowM3s > fan.Points[fan.Points.Length - 1].FlowM3s)
                 return null;
-            }
+            return fan.StaticPressureAt(designFlowM3s) - requiredStaticPa;
         }
 
         /// <summary>Pick the first fan from <paramref name="curves"/> that

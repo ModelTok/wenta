@@ -15,8 +15,8 @@ namespace Wenta
     /// split at junctions/endpoints, and build a Network (Source / RigidDuct /
     /// Tee / Terminal) with flow rooted at one source endpoint.</item>
     /// <item><see cref="TracedSystem.Flatten"/> — project back into drawable
-    /// <see cref="DuctSegment"/> primitives (defined in Clash.cs, which already
-    /// mirrors this module's Rust `Segment` type).</item>
+    /// <see cref="DuctSegment"/> primitives (defined in Geometry.cs; mirrors
+    /// this module's Rust `Segment` type and is shared with clash detection).</item>
     /// </list>
     ///
     /// Scope: round ducts, one source, no closed loops (a tree). Supported:
@@ -153,12 +153,9 @@ namespace Wenta
             public override int GetHashCode() { unchecked { return (int)(X * 397 ^ Y); } }
         }
 
-        private static double Dist2(Point2 a, Point2 b)
-        {
-            double dx = a.X - b.X;
-            double dy = a.Y - b.Y;
-            return dx * dx + dy * dy;
-        }
+        // Deterministic junction-adjacency order: by chain index.
+        private static readonly Comparison<IntPair> ByChainIndex =
+            delegate (IntPair x, IntPair y) { return x.A.CompareTo(y.A); };
 
         // Coalesce a point to an existing vertex within `snap`, or create a
         // new one. Mirrors the 3x3 neighbour-cell probe in the Rust original.
@@ -174,7 +171,7 @@ namespace Wenta
                     int existing;
                     if (cache.TryGetValue(new GridKey(kx + dx, ky + dy), out existing))
                     {
-                        if (Dist2(verts[existing].Point, p) <= snap * snap)
+                        if (verts[existing].Point.DistanceSquaredTo(p) <= snap * snap)
                             return existing;
                     }
                 }
@@ -220,6 +217,7 @@ namespace Wenta
         /// (loop / unsupported topology).</exception>
         public static TracedSystem Trace(IList<Polyline> polylines, TraceOptions opts)
         {
+            // Null, empty, or nothing with >= 2 points -> unusable.
             bool anyUsable = false;
             if (polylines != null)
             {
@@ -228,7 +226,7 @@ namespace Wenta
                     if (p.Points.Count >= 2) { anyUsable = true; break; }
                 }
             }
-            if (polylines == null || polylines.Count == 0 || !anyUsable)
+            if (!anyUsable)
                 throw new WentaException("no usable polylines");
 
             // 1. Coalesce vertices and build an undirected adjacency.
@@ -247,22 +245,20 @@ namespace Wenta
                     prev = cur;
                 }
             }
-            if (verts.Count == 0)
-                throw new WentaException("no usable geometry");
+            // (anyUsable guarantees at least one SnapVertex call, so verts is
+            // non-empty here.)
 
             // 2. Degrees + adjacency.
             int n = verts.Count;
-            int[] deg = new int[n];
             List<int>[] adj = new List<int>[n];
             for (int i = 0; i < n; i++) adj[i] = new List<int>();
             foreach (IntPair e in edges)
             {
-                deg[e.A]++;
-                deg[e.B]++;
+                verts[e.A].Degree++;
+                verts[e.B].Degree++;
                 adj[e.A].Add(e.B);
                 adj[e.B].Add(e.A);
             }
-            for (int v = 0; v < n; v++) verts[v].Degree = deg[v];
 
             // Reject unsupported geometry.
             for (int i = 0; i < n; i++)
@@ -288,7 +284,7 @@ namespace Wenta
 
             for (int v = 0; v < n; v++)
             {
-                if (deg[v] == 2) continue;
+                if (verts[v].Degree == 2) continue;
                 foreach (int nb in adj[v])
                 {
                     if (seen.Contains(EncodePair(v, nb))) continue;
@@ -296,28 +292,26 @@ namespace Wenta
                     List<Point2> pathPts = new List<Point2> { verts[v].Point };
                     int cur = v;
                     int nxt = nb;
-                    int reached = -1;
-                    bool foundReached = false;
+                    int reached = -1; // junction/end vertex the chain arrives at
                     while (true)
                     {
-                        if (seen.Contains(EncodePair(cur, nxt))) break;
-                        seen.Add(EncodePair(cur, nxt));
+                        if (!seen.Add(EncodePair(cur, nxt))) break;
                         seen.Add(EncodePair(nxt, cur)); // undirected visit
                         pathPts.Add(verts[nxt].Point);
                         if (verts[nxt].Degree != 2)
                         {
                             reached = nxt;
-                            foundReached = true;
                             break;
                         }
-                        // advance through the degree-2 vertex
-                        List<int> nexts = new List<int>();
-                        foreach (int t in adj[nxt]) if (t != cur) nexts.Add(t);
-                        if (nexts.Count == 0) break;
+                        // advance through the degree-2 vertex: its single
+                        // neighbour other than the one we came from
+                        int next = -1;
+                        foreach (int t in adj[nxt]) if (t != cur) { next = t; break; }
+                        if (next < 0) break;
                         cur = nxt;
-                        nxt = nexts[0];
+                        nxt = next;
                     }
-                    if (foundReached)
+                    if (reached >= 0)
                     {
                         string id = "duct" + chainId;
                         chainId++;
@@ -326,7 +320,7 @@ namespace Wenta
                             diameter = opts.DefaultDiameter;
                         double lengthM = 0.0;
                         for (int i = 1; i < pathPts.Count; i++)
-                            lengthM += Math.Sqrt(Dist2(pathPts[i - 1], pathPts[i]));
+                            lengthM += pathPts[i - 1].DistanceTo(pathPts[i]);
                         chains.Add(new Chain(id, pathPts, lengthM, diameter));
                         chainEnds.Add(new IntPair(v, reached));
                     }
@@ -365,7 +359,7 @@ namespace Wenta
                 List<IntPair> downstream = new List<IntPair>();
                 foreach (IntPair inc in incident)
                     if (inc.A != cameIn) downstream.Add(inc);
-                downstream.Sort(delegate (IntPair x, IntPair y) { return x.A.CompareTo(y.A); }); // deterministic order
+                downstream.Sort(ByChainIndex);
 
                 for (int k = 0; k < downstream.Count; k++)
                 {
@@ -376,10 +370,10 @@ namespace Wenta
                     // if this junction is a tee, classify its legs
                     if (verts[jv].Degree == 3)
                     {
+                        Dictionary<int, string> legs = GetOrAddTeeLeg(teeLeg, jv);
                         if (cameIn != -1)
-                            GetOrAddTeeLeg(teeLeg, jv)[cameIn] = "combined";
-                        string port = (k == 0) ? "straight" : "branch";
-                        GetOrAddTeeLeg(teeLeg, jv)[ci] = port;
+                            legs[cameIn] = "combined";
+                        legs[ci] = (k == 0) ? "straight" : "branch";
                     }
                     visited.Add(other);
                     queue.Enqueue(new IntPair(other, ci));
@@ -439,7 +433,7 @@ namespace Wenta
                 int up = d.A, down = d.B;
 
                 Round rd = new Round(ch.Diameter);
-                net.Add(ch.Id, new RigidDuct(ch.Id, rd, ch.LengthM, 0.0001));
+                net.Add(ch.Id, new RigidDuct(ch.Id, rd, ch.LengthM, RigidDuct.DefaultAbsoluteRoughness));
 
                 string ductIn = ch.Id + ".inlet";
                 string ductOut = ch.Id + ".outlet";
@@ -469,24 +463,13 @@ namespace Wenta
                 }
 
                 // --- downstream leg (what this duct feeds) ---
-                string downTerm;
+                string downTerm, downTee;
                 if (terminalOf.TryGetValue(down, out downTerm))
-                {
                     net.Connect(ductOut, downTerm);
-                }
+                else if (teeOf.TryGetValue(down, out downTee))
+                    net.Connect(ductOut, downTee + ".combined"); // feeds the tee's In leg
                 else
-                {
-                    string downTee;
-                    if (teeOf.TryGetValue(down, out downTee))
-                    {
-                        // this chain feeds INTO the tee's combined (In) leg
-                        net.Connect(ductOut, downTee + ".combined");
-                    }
-                    else
-                    {
-                        throw new WentaException("downstream end resolved to the source (invalid tree)");
-                    }
-                }
+                    throw new WentaException("downstream end resolved to the source (invalid tree)");
             }
 
             return new TracedSystem(net, chains);

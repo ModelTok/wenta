@@ -116,8 +116,9 @@ namespace Wenta
         }
 
         /// <summary>Format with up to 6 decimals, trimming trailing zeros:
-        /// -0.03125 → "-0.03125", 14.4 → "14.4", 0.0 → "0".</summary>
-        private static string FmtNum(double v)
+        /// -0.03125 → "-0.03125", 14.4 → "14.4", 0.0 → "0". Shared with
+        /// <see cref="ClashDetection.ClashesAsCsv"/>.</summary>
+        internal static string FmtNum(double v)
         {
             return v.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture);
         }

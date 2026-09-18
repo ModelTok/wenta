@@ -44,18 +44,13 @@ namespace Wenta
             d.Add(new KeyValuePair<string, string>("component_id", ComponentId));
             d.Add(new KeyValuePair<string, string>("name", Name));
             d.Add(new KeyValuePair<string, string>("component_type", ComponentType));
-            d.Add(new KeyValuePair<string, string>("flowrate_in", OptFmt(FlowrateIn)));
-            d.Add(new KeyValuePair<string, string>("flowrate_out", OptFmt(FlowrateOut)));
-            d.Add(new KeyValuePair<string, string>("velocity_in", OptFmt(VelocityIn)));
-            d.Add(new KeyValuePair<string, string>("velocity_out", OptFmt(VelocityOut)));
+            d.Add(new KeyValuePair<string, string>("flowrate_in", Results.FmtOpt(FlowrateIn)));
+            d.Add(new KeyValuePair<string, string>("flowrate_out", Results.FmtOpt(FlowrateOut)));
+            d.Add(new KeyValuePair<string, string>("velocity_in", Results.FmtOpt(VelocityIn)));
+            d.Add(new KeyValuePair<string, string>("velocity_out", Results.FmtOpt(VelocityOut)));
             d.Add(new KeyValuePair<string, string>(
                 "pressure_drop", PressureDrop.ToString(CultureInfo.InvariantCulture)));
             return d;
-        }
-
-        private static string OptFmt(double? v)
-        {
-            return v.HasValue ? v.Value.ToString(CultureInfo.InvariantCulture) : "";
         }
     }
 
@@ -78,19 +73,14 @@ namespace Wenta
             {
                 string cid = kv.Key;
                 Component c = kv.Value;
-                var inPorts = new List<Port>(c.Inlets);
-                var outPorts = new List<Port>(c.Outlets);
 
                 // A port's velocity is considered "set" once it has a flowrate
                 // (i.e. it went through solve); matches the Rust/Python reference
                 // semantics.
-                double? flowrateIn = FirstOpt(inPorts, p => p.Flowrate);
-                double? flowrateOut = FirstOpt(outPorts, p => p.Flowrate);
-                double? velocityIn = FirstOpt(inPorts, p => p.Flowrate.HasValue ? p.Velocity : null);
-                double? velocityOut = FirstOpt(outPorts, p => p.Flowrate.HasValue ? p.Velocity : null);
-
-                double pressureDrop = 0.0;
-                foreach (Port p in c.Ports) pressureDrop += p.PressureDrop;
+                double? flowrateIn = FirstOpt(c.Inlets, p => p.Flowrate);
+                double? flowrateOut = FirstOpt(c.Outlets, p => p.Flowrate);
+                double? velocityIn = FirstOpt(c.Inlets, p => p.Flowrate.HasValue ? p.Velocity : null);
+                double? velocityOut = FirstOpt(c.Outlets, p => p.Flowrate.HasValue ? p.Velocity : null);
 
                 results.Add(new ComponentResult
                 {
@@ -101,7 +91,7 @@ namespace Wenta
                     FlowrateOut = flowrateOut,
                     VelocityIn = velocityIn,
                     VelocityOut = velocityOut,
-                    PressureDrop = pressureDrop,
+                    PressureDrop = c.TotalPressureDrop(),
                 });
             }
             return results;
@@ -116,6 +106,14 @@ namespace Wenta
                 if (v.HasValue) return v;
             }
             return null;
+        }
+
+        /// <summary>Format an optional double with the invariant culture
+        /// (plain <c>ToString()</c>); null renders as an empty string. Shared
+        /// by the CSV renderers in Results, Marking and Electrical.</summary>
+        internal static string FmtOpt(double? v)
+        {
+            return v.HasValue ? v.Value.ToString(CultureInfo.InvariantCulture) : "";
         }
 
         /// <summary>Export results as a CSV string with a header row.</summary>
@@ -149,11 +147,7 @@ namespace Wenta
             for (int i = 0; i < headerLabels.Length; i++)
                 headerParts[i] = headerLabels[i].PadRight(headerWidths[i]);
             string header = string.Join(" | ", headerParts);
-
-            int sepLen = 0;
-            foreach (int w in headerWidths) sepLen += w;
-            sepLen += headerWidths.Length * 3 - 3;
-            string sepLine = new string('-', sepLen);
+            string sepLine = new string('-', header.Length);
 
             var lines = new List<string> { sepLine, header, sepLine };
             foreach (ComponentResult r in results)
