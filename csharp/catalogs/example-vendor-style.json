@@ -1,0 +1,101 @@
+{
+  "name": "ExampleVent-fictional",
+  "version": 1,
+  "description": "Vendor-style catalog for a FICTIONAL manufacturer 'ExampleVent'. Shows product-code ids, per-series size windows, and two deliberate overrides of ids in example-generic.json (rect-elbow-r1.0 and vav-box). All numbers are invented to look plausible; this is not real vendor data and must not be used for design.",
+  "fittings": [
+    {
+      "id": "rect-elbow-r1.0",
+      "type": "rect_elbow",
+      "size_min_mm": [100, 100],
+      "size_max_mm": [1200, 2000],
+      "zeta": 0.19,
+      "source": "ExampleVent RE series R = 1.0 W (fictional example - not real vendor data)",
+      "knr": "KNR 2-08 03xx (configure per edition)",
+      "notes": "Same id as example-generic.json: when merged after it, this entry replaces the generic one in place and Merge() records a warning."
+    },
+    {
+      "id": "vav-box",
+      "type": "damper",
+      "size_min_mm": [100],
+      "size_max_mm": [630],
+      "zeta": 0.30,
+      "source": "ExampleVent VAV-1 fully open (fictional example - not real vendor data)",
+      "knr": "KNR 2-08 04xx (configure per edition)",
+      "notes": "Same id as example-generic.json; overrides it on merge."
+    },
+    {
+      "id": "EV-RB-100-250",
+      "type": "round_elbow",
+      "size_min_mm": [100],
+      "size_max_mm": [250],
+      "zeta": 0.27,
+      "source": "ExampleVent RB pressed bend 90 deg, R/D = 1.0, D 100-250 (fictional example - not real vendor data)",
+      "knr": "KNR 2-08 03xx (configure per edition)"
+    },
+    {
+      "id": "EV-RB-280-630",
+      "type": "round_elbow",
+      "size_min_mm": [280],
+      "size_max_mm": [630],
+      "zeta": 0.24,
+      "source": "ExampleVent RB segmented bend 90 deg, R/D = 1.0, D 280-630 (fictional example - not real vendor data)",
+      "knr": "KNR 2-08 03xx (configure per edition)"
+    },
+    {
+      "id": "EV-RB-710-1250",
+      "type": "round_elbow",
+      "size_min_mm": [710],
+      "size_max_mm": [1250],
+      "zeta": 0.22,
+      "source": "ExampleVent RB segmented bend 90 deg, R/D = 1.0, D 710-1250 (fictional example - not real vendor data)",
+      "knr": "KNR 2-08 03xx (configure per edition)",
+      "notes": "When merged after example-generic.json, the generic windowless 'round-elbow-r1.0' precedes all EV-RB entries and wins every round_elbow type match. Override that id to take over by-type matching."
+    },
+    {
+      "id": "EV-RE-900-1600",
+      "type": "rect_elbow",
+      "size_min_mm": [900, 200],
+      "size_max_mm": [1600, 1200],
+      "zeta": 0.16,
+      "source": "ExampleVent RE large rectangular elbow R = 1.5 W, W 900-1600 x H 200-1200 (fictional example - not real vendor data)",
+      "knr": "KNR 2-08 03xx (configure per edition)",
+      "notes": "Extends coverage beyond the generic 1200 mm width: sizes like [1400, 800] match here after the generic windows fail."
+    },
+    {
+      "id": "EV-TB-100-630",
+      "type": "tee",
+      "size_min_mm": [100],
+      "size_max_mm": [630],
+      "zeta": 0.55,
+      "source": "ExampleVent TB round tee, branch leg, D 100-630 (fictional example - not real vendor data)",
+      "knr": "KNR 2-08 03xx (configure per edition)"
+    },
+    {
+      "id": "EV-VD-710-1250",
+      "type": "damper",
+      "size_min_mm": [710],
+      "size_max_mm": [1250],
+      "zeta": 0.12,
+      "source": "ExampleVent VD volume damper fully open, D 710-1250 (fictional example - not real vendor data)",
+      "knr": "KNR 2-08 04xx (configure per edition)"
+    },
+    {
+      "id": "EV-CD-300-600",
+      "type": "diffuser",
+      "size_min_mm": [300, 300],
+      "size_max_mm": [600, 600],
+      "zeta": 0.42,
+      "source": "ExampleVent CD square ceiling diffuser, face 300-600 (fictional example - not real vendor data)",
+      "knr": "KNR 2-08 05xx (configure per edition)"
+    },
+    {
+      "id": "EV-RG-200-1000",
+      "type": "grille",
+      "size_min_mm": [200, 100],
+      "size_max_mm": [1000, 600],
+      "zeta": 0.31,
+      "source": "ExampleVent RG return grille, W 200-1000 x H 100-600 (fictional example - not real vendor data)",
+      "knr": "KNR 2-08 05xx (configure per edition)"
+    }
+  ]
+}

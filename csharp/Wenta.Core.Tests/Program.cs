@@ -52,6 +52,7 @@ namespace Wenta.Core.Tests
             RunSound();
             RunElectrical();
             RunNetworkJson();
+            RunCatalogMerge(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "catalogs"));
 
             Console.WriteLine();
             Console.WriteLine("==== " + _pass + " passed, " + _fail + " failed ====");
@@ -1794,6 +1795,51 @@ namespace Wenta.Core.Tests
             ExpectError(true, "json.err_schema_version", () => NetworkJson.Parse(
                 "{\"schema_version\":2,\"components\":[],\"connections\":[]}"));
             ExpectError(true, "json.err_not_json", () => NetworkJson.Parse("not json"));
+        }
+
+        // ---- Catalog merge + shipped example catalogs (issue #53) ----
+        private static void RunCatalogMerge(string catalogDir)
+        {
+            ZetaCatalog generic = ZetaCatalog.Load(Path.Combine(catalogDir, "example-generic.json"));
+            ZetaCatalog round = ZetaCatalog.Load(Path.Combine(catalogDir, "example-generic-round.json"));
+            ZetaCatalog vendor = ZetaCatalog.Load(Path.Combine(catalogDir, "example-vendor-style.json"));
+            CheckInt("catmerge.generic_count", generic.Fittings.Count, 5);
+            CheckInt("catmerge.round_count", round.Fittings.Count, 8);
+            CheckInt("catmerge.vendor_count", vendor.Fittings.Count, 10);
+            CheckInt("catmerge.load_no_warnings", generic.Warnings.Count + round.Warnings.Count + vendor.Warnings.Count, 0);
+            CheckInt("catmerge.schema_version", ZetaCatalog.SchemaVersion, 1);
+
+            ZetaCatalog merged = ZetaCatalog.Merge(generic, vendor);
+            CheckInt("catmerge.merged_count", merged.Fittings.Count, 13);
+            CheckInt("catmerge.warning_count", merged.Warnings.Count, 2);
+            CheckStr("catmerge.merged_name", merged.Name, "example-generic-rect+ExampleVent-fictional");
+            CheckStr("catmerge.warning_text", merged.Warnings[1],
+                "id vav-box: zeta 0.35 (source generic VAV box fully open (example entry)) overridden by " +
+                "zeta 0.3 (source ExampleVent VAV-1 fully open (fictional example - not real vendor data))");
+            // Overrides replace in place; untouched ids keep the base value; vendor-only ids are appended.
+            Check("catmerge.overridden_elbow", merged.ById("rect-elbow-r1.0").Zeta, 0.19, 1e-12);
+            Check("catmerge.overridden_vav", merged.ById("vav-box").Zeta, 0.30, 1e-12);
+            CheckStr("catmerge.override_in_place", merged.Fittings[1].Id, "rect-elbow-r1.0");
+            Check("catmerge.base_kept", merged.ById("rect-elbow-r1.5").Zeta, 0.17, 1e-12);
+            Check("catmerge.vendor_only", merged.ById("EV-RB-280-630").Zeta, 0.24, 1e-12);
+            CheckStr("catmerge.appended_first", merged.Fittings[5].Id, "EV-RB-100-250");
+            CheckStr("catmerge.appended_last", merged.Fittings[12].Id, "EV-RG-200-1000");
+            Check("catmerge.zeta_damper_small", merged.ZetaFor("damper", new[] { 300.0 }), 0.30, 1e-12);
+            Check("catmerge.zeta_damper_large", merged.ZetaFor("damper", new[] { 800.0 }), 0.12, 1e-12);
+            Check("catmerge.zeta_rect_elbow_big", merged.ZetaFor("rect_elbow", new[] { 1400.0, 800.0 }), 0.16, 1e-12);
+            Check("catmerge.zeta_grille_vendor", merged.ZetaFor("grille", new[] { 300.0, 200.0 }), 0.31, 1e-12);
+            Check("catmerge.zeta_grille_fallback", generic.ZetaFor("grille", new[] { 300.0, 200.0 }), 0.2875, 1e-12);
+
+            ZetaCatalog three = ZetaCatalog.Merge(new[] { generic, round, vendor });
+            CheckInt("catmerge.threeway_count", three.Fittings.Count, 21);
+            CheckInt("catmerge.threeway_warnings", three.Warnings.Count, 2);
+            CheckInt("catmerge.warnings_carried", ZetaCatalog.Merge(merged, round).Warnings.Count, 2);
+            CheckInt("catmerge.self_merge_warns_all", ZetaCatalog.Merge(generic, generic).Warnings.Count, 5);
+
+            ExpectError(true, "catmerge.err_newer_version", () =>
+                ZetaCatalog.Parse("{\"name\":\"v99\",\"version\":99,\"fittings\":[]}", "inline-v99"));
+            ExpectError(true, "catmerge.err_bool_zeta", () =>
+                ZetaCatalog.Parse("{\"name\":\"b\",\"version\":1,\"fittings\":[{\"id\":\"x\",\"zeta\":true}]}", "inline-bool"));
         }
     }
 }

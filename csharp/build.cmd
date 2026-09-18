@@ -70,6 +70,7 @@ rem ---- Wenta.Core.Tests.exe ----
 if errorlevel 1 ( echo BUILD FAILED: tests & exit /b 1 )
 
 xcopy /y /e /i "%ROOT%Wenta.Core.Tests\vectors" "%OUT%\vectors" >nul
+xcopy /y /i "%ROOT%catalogs\*.json" "%OUT%\catalogs" >nul
 
 echo BUILD OK
 echo RUN TESTS:   %OUT%\Wenta.Core.Tests.exe

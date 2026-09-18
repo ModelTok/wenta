@@ -24,7 +24,8 @@ Wenta.Core/           pure C# library (compiles standalone, net48-compatible)
   Fabrication.cs Development.cs Clash.cs Topology.cs Settings.cs
 Wenta.Core.Tests/     console test runner (Program.cs, no xUnit needed)
   vectors/            CSV parity vectors (frozen golden fixtures, see below)
-catalogs/             example-generic.json — open zeta-catalog format
+catalogs/             open ζ-catalog format: FORMAT.md (spec) + example-generic,
+                      example-generic-round, example-vendor-style (fictional vendor)
 build.cmd             builds core + tests, copies vectors
 ```
 
@@ -62,8 +63,10 @@ Two kinds of assertions, both in `Wenta.Core.Tests/Program.cs`:
 
 ## Beyond the reference surface
 
-- **`Catalog.cs`** — the open ζ-catalog format (JSON): pluggable
-  manufacturer loss tables with provenance and KNR codes, vendor-mergeable.
+- **`Catalog.cs`** — the open ζ-catalog format (JSON, spec in
+  `catalogs/FORMAT.md`): pluggable manufacturer loss tables with provenance
+  and KNR codes; `ZetaCatalog.Merge` layers vendor catalogs over a base by
+  entry id and records every override in `Warnings`.
 - **`Bom.cs`** — bill of materials with KNR-ready rows from a solved network.
 - **`Standards.cs`** — selectable EN 1505/1506, ASHRAE/SMACNA and DIN 24155
   size tables (`Standard` enum) on top of the canonical EN tables in

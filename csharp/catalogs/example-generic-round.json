@@ -1,0 +1,82 @@
+{
+  "name": "example-generic-round",
+  "version": 1,
+  "description": "Round-duct fittings only. Every zeta here is a typical textbook-order value chosen to exercise the format; none is measured vendor data. Replace with vendor data before sizing real work. Sizes are the duct diameter in mm: size_min_mm/size_max_mm = [d].",
+  "fittings": [
+    {
+      "id": "round-elbow-rd0.75",
+      "type": "round_elbow",
+      "size_min_mm": [100],
+      "size_max_mm": [1250],
+      "zeta": 0.33,
+      "source": "typical value, smooth 90 deg round elbow R/D = 0.75, example entry - replace with vendor data",
+      "knr": "KNR 2-08 03xx (configure per edition)"
+    },
+    {
+      "id": "round-elbow-rd1.0",
+      "type": "round_elbow",
+      "size_min_mm": [100],
+      "size_max_mm": [1250],
+      "zeta": 0.24,
+      "source": "typical value, smooth 90 deg round elbow R/D = 1.0, example entry - replace with vendor data",
+      "knr": "KNR 2-08 03xx (configure per edition)"
+    },
+    {
+      "id": "round-elbow-rd1.5",
+      "type": "round_elbow",
+      "size_min_mm": [100],
+      "size_max_mm": [1250],
+      "zeta": 0.17,
+      "source": "typical value, smooth 90 deg round elbow R/D = 1.5, example entry - replace with vendor data",
+      "knr": "KNR 2-08 03xx (configure per edition)"
+    },
+    {
+      "id": "round-elbow-rd2.0",
+      "type": "round_elbow",
+      "size_min_mm": [100],
+      "size_max_mm": [1250],
+      "zeta": 0.14,
+      "source": "typical value, smooth 90 deg round elbow R/D = 2.0, example entry - replace with vendor data",
+      "knr": "KNR 2-08 03xx (configure per edition)",
+      "notes": "Listed after the tighter radii on purpose: with identical windows, Match() by type returns the first entry (R/D 0.75). Use ById() to pick a specific radius, or give each radius its own type."
+    },
+    {
+      "id": "round-tee-branch",
+      "type": "tee",
+      "size_min_mm": [100],
+      "size_max_mm": [1250],
+      "zeta": 0.60,
+      "source": "typical value, 90 deg round tee, branch leg referred to branch velocity, example entry - replace with vendor data",
+      "knr": "KNR 2-08 03xx (configure per edition)"
+    },
+    {
+      "id": "round-tee-straight",
+      "type": "tee_straight",
+      "size_min_mm": [100],
+      "size_max_mm": [1250],
+      "zeta": 0.10,
+      "source": "typical value, 90 deg round tee, straight-through leg referred to main velocity, example entry - replace with vendor data",
+      "knr": "KNR 2-08 03xx (configure per edition)",
+      "notes": "Distinct type so it does not shadow the branch leg under first-match-wins. 'tee_straight' has no built-in correlation fallback."
+    },
+    {
+      "id": "round-reducer-0.8",
+      "type": "reducer",
+      "size_min_mm": [100],
+      "size_max_mm": [1250],
+      "zeta": 0.17,
+      "source": "FittingsLibrary.ReducerRound at d_out/d_in = 0.8, 45 deg (0.04 + 0.37*(1 - 0.64) = 0.1732), referred to outlet velocity; example entry - replace with vendor data",
+      "knr": "KNR 2-08 03xx (configure per edition)",
+      "notes": "'reducer' has no built-in correlation fallback in ZetaFor(); a catalog entry is the only way to supply it."
+    },
+    {
+      "id": "round-damper-butterfly-open",
+      "type": "damper",
+      "size_min_mm": [100],
+      "size_max_mm": [1250],
+      "zeta": 0.10,
+      "source": "FittingsLibrary.DamperButterfly(100) = 0.10 fully open; example entry - replace with vendor data",
+      "knr": "KNR 2-08 04xx (configure per edition)"
+    }
+  ]
+}
