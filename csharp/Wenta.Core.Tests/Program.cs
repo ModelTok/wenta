@@ -52,6 +52,7 @@ namespace Wenta.Core.Tests
             RunSound();
             RunElectrical();
             RunNetworkJson();
+            RunResolve();
             RunCatalogMerge(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "catalogs"));
 
             Console.WriteLine();
@@ -1727,6 +1728,28 @@ namespace Wenta.Core.Tests
             CheckInt("electrical.len_two", s.Len(), 2);
             CheckTrue("electrical.not_empty", !s.IsEmpty());
             CheckInt("electrical.iter_count", new List<ElectricalData>(s.Iter()).Count, 2);
+        }
+
+        // ---- Solver idempotence: a second Solve must not accumulate flow ----
+        private static void RunResolve()
+        {
+            Network tee = TeeNetwork();
+            double dp1 = tee.Solve();
+            double flow1 = tee.Components["duct"].Port_("inlet").Flowrate ?? 0.0;
+            double dp2 = tee.Solve();
+            Check("resolve.dp_identical", dp2, dp1, 0.0);
+            Check("resolve.flow_identical", tee.Components["duct"].Port_("inlet").Flowrate ?? 0.0, flow1, 0.0);
+            Check("resolve.flow_is_demand_sum", flow1, 0.1, 1e-12);
+
+            // Analysis on an already-solved network equals analysis on a fresh one.
+            Fluid air = Fluid.StandardAir();
+            AnalysisSummary fresh = Analysis.Analyze(TeeNetwork(), air);
+            AnalysisSummary again = Analysis.Analyze(tee, air);
+            Check("resolve.analysis_critical_dp", again.CriticalDpPa, fresh.CriticalDpPa, 0.0);
+            CheckInt("resolve.analysis_branches", again.NBranches, fresh.NBranches);
+            for (int i = 0; i < fresh.Branches.Count; i++)
+                Check("resolve.analysis_flow_" + fresh.Branches[i].ComponentId,
+                    again.Branches[i].FlowM3s, fresh.Branches[i].FlowM3s, 0.0);
         }
 
         // ---- NetworkJson (issue #46) — versioned JSON round-trip of a Network ----

@@ -59,12 +59,10 @@ namespace Wenta
         /// (which clones the network) and from <see cref="Bom.Build"/>,
         /// <see cref="Results.ExtractResults"/> and
         /// <see cref="Marking.AssignBranchMarks"/>, which are read-only over a
-        /// network the caller has already solved. Pass a freshly built
-        /// network: <see cref="Solver.PropagateFlowrates"/> resets the
-        /// port-node flows but not the component-node accumulators, so
-        /// re-solving an already-solved network is not guaranteed to
-        /// reproduce the first solve. Callers that need the original network
-        /// preserved should build a fresh copy before calling this method.
+        /// network the caller has already solved. Solving is idempotent
+        /// (<see cref="Solver.PropagateFlowrates"/> resets every node's flow
+        /// first), so calling this on an already-solved network reproduces
+        /// the first solve; it just cannot leave the network untouched.
         ///
         /// For every RigidDuct/FlexDuct branch:
         /// * FlowM3s — the inlet-port flowrate after the solve.

@@ -16,9 +16,15 @@ namespace Wenta
         {
             List<string> topo = network.TopoOrder();
 
+            // Reset component nodes as well as port nodes: flow is forwarded to
+            // every predecessor, so a stale component-node value would be
+            // re-propagated upstream and double the flows on a second solve.
             foreach (var kv in network.Components)
+            {
+                network.SetNodeFlow(kv.Key, 0.0);
                 foreach (Port p in kv.Value.Ports)
                     network.SetNodeFlow(p.NodeId, 0.0);
+            }
 
             foreach (Terminal term in network.Terminals())
                 network.SetNodeFlow(term.Ports[0].NodeId, term.Flowrate);
