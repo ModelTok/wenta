@@ -55,7 +55,8 @@ rem ---- Wenta.Core.dll ----
   "%ROOT%Wenta.Core\Fan.cs" ^
   "%ROOT%Wenta.Core\Insulation.cs" ^
   "%ROOT%Wenta.Core\Sound.cs" ^
-  "%ROOT%Wenta.Core\Electrical.cs"
+  "%ROOT%Wenta.Core\Electrical.cs" ^
+  "%ROOT%Wenta.Core\NetworkJson.cs"
 if errorlevel 1 ( echo BUILD FAILED: Wenta.Core & exit /b 1 )
 
 rem ---- Wenta.Core.Tests.exe ----

@@ -66,7 +66,8 @@ if not exist "%OUT%" mkdir "%OUT%"
   "%CORE%\Fan.cs" ^
   "%CORE%\Insulation.cs" ^
   "%CORE%\Sound.cs" ^
-  "%CORE%\Electrical.cs"
+  "%CORE%\Electrical.cs" ^
+  "%CORE%\NetworkJson.cs"
 
 if errorlevel 1 ( echo BUILD FAILED & exit /b 1 )
 

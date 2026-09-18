@@ -51,6 +51,7 @@ namespace Wenta.Core.Tests
             RunInsulation();
             RunSound();
             RunElectrical();
+            RunNetworkJson();
 
             Console.WriteLine();
             Console.WriteLine("==== " + _pass + " passed, " + _fail + " failed ====");
@@ -1725,6 +1726,74 @@ namespace Wenta.Core.Tests
             CheckInt("electrical.len_two", s.Len(), 2);
             CheckTrue("electrical.not_empty", !s.IsEmpty());
             CheckInt("electrical.iter_count", new List<ElectricalData>(s.Iter()).Count, 2);
+        }
+
+        // ---- NetworkJson (issue #46) — versioned JSON round-trip of a Network ----
+        private static Network TeeNetwork()
+        {
+            var net = new Network { Name = "tee" };
+            net.Add("ahu", new Source("AHU"));
+            net.Add("duct", new RigidDuct("duct", new Round(0.315), 20.0));
+            net.Add("tee", new Tee("tee", new Round(0.315), 0.1, 0.4));
+            net.Add("d2", new RigidDuct("d2", new Round(0.2), 5.0));
+            net.Add("flex", new FlexDuct("flex", 0.125, 3.0, 2.0, 100.0));
+            net.Add("t1", new Terminal("t1", 0.06));
+            net.Add("t2", new Terminal("t2", 0.04));
+            net.Connect("ahu", "duct");
+            net.Connect("duct", "tee");
+            net.Connect("tee.straight", "d2");
+            net.Connect("tee.branch", "flex");
+            net.Connect("d2", "t1");
+            net.Connect("flex", "t2");
+            return net;
+        }
+
+        private static void RunNetworkJson()
+        {
+            // Round trip of the two parity networks: identical topology and
+            // bit-identical critical path after serialize -> parse -> solve.
+            Network tee = TeeNetwork();
+            double dpTee = tee.Solve();
+            string json = NetworkJson.Serialize(TeeNetwork());
+            Dictionary<string, ComponentMeta> meta;
+            Network back = NetworkJson.Parse(json, out meta);
+            CheckInt("json.tee_component_count", back.Components.Count, 7);
+            CheckStr("json.tee_name", back.Name, "tee");
+            CheckStr("json.tee_class_tee", NetworkJson.WentaClassOf(back.Components["tee"]), "Tee");
+            CheckStr("json.tee_class_flex", NetworkJson.WentaClassOf(back.Components["flex"]), "FlexDuct");
+            Check("json.tee_dp_roundtrip", back.Solve(), dpTee, 1e-12);
+            Check("json.tee_dp_vector", dpTee, 7.629497821799035, 1e-12);
+            Check("json.tee_branch_flow", back.Components["tee"].Port_("branch").Flowrate ?? 0.0, 0.04, 1e-12);
+            CheckInt("json.tee_meta_count", meta.Count, 7);
+            CheckTrue("json.tee_guid_generated", meta["duct"].Guid != null && meta["duct"].Guid.Length >= 32);
+            CheckStr("json.reserialize_stable", NetworkJson.Serialize(back, meta), json);
+
+            var chain = new Network { Name = "readme" };
+            chain.Add("ahu", new Source("AHU"));
+            chain.Add("duct", new RigidDuct("duct", new Round(0.2), 20.0));
+            chain.Add("term", new Terminal("terminal", 0.1));
+            chain.Connect("ahu", "duct");
+            chain.Connect("duct", "term");
+            var chainMeta = new Dictionary<string, ComponentMeta>
+            {
+                { "duct", new ComponentMeta { Guid = "0f8fad5b-d9cb-469f-a165-70867728950e", DrawingScope = "Model" } }
+            };
+            string chainJson = NetworkJson.Serialize(chain, chainMeta);
+            CheckTrue("json.schema_version_field", chainJson.Contains("\"schema_version\":1"));
+            CheckTrue("json.wenta_class_field", chainJson.Contains("\"wenta_class\":\"RigidDuct\""));
+            Dictionary<string, ComponentMeta> meta2;
+            Network chainBack = NetworkJson.Parse(chainJson, out meta2);
+            Check("json.chain_dp", chainBack.Solve(), 14.13473757973617, 1e-12);
+            CheckStr("json.guid_roundtrip", meta2["duct"].Guid, "0f8fad5b-d9cb-469f-a165-70867728950e");
+            CheckStr("json.scope_roundtrip", meta2["duct"].DrawingScope, "Model");
+
+            // Malformed input is rejected, never silently ignored.
+            ExpectError(true, "json.err_no_components", () => NetworkJson.Parse("{\"schema_version\":1,\"name\":\"x\"}"));
+            ExpectError(true, "json.err_unknown_class", () => NetworkJson.Parse(
+                "{\"schema_version\":1,\"components\":[{\"id\":\"a\",\"wenta_class\":\"Nozzle\"}],\"connections\":[]}"));
+            ExpectError(true, "json.err_schema_version", () => NetworkJson.Parse(
+                "{\"schema_version\":2,\"components\":[],\"connections\":[]}"));
+            ExpectError(true, "json.err_not_json", () => NetworkJson.Parse("not json"));
         }
     }
 }
