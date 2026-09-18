@@ -28,7 +28,7 @@ Mojo, Rust or WASM at runtime.
 ## Build → install → verify
 
 ```cmd
-just csharp-parity            # 551/551 vector + catalog/bom/balancing/room assertions
+just csharp-parity            # 857 assertions: frozen vectors + closed-form module tests
 just zwcad-build              # WentaZwcad.dll (core compiled in) + CUIX
 powershell -ExecutionPolicy Bypass -File install.ps1   # elevated
 ```
@@ -63,7 +63,7 @@ WENTAHELLO ok  ZWCAD 21.10.21.0
 
 ```
 WentaZwcad/        plugin sources (Commands, Plugin, WentaPanel)
-../csharp/         Wenta.Core + parity suite + vector generator + catalogs
+../csharp/         Wenta.Core + test suite (frozen vectors) + catalogs
 tools/MakeCuix.cs  CUIX ribbon package builder
 build.cmd install.ps1 uninstall.ps1   build & deploy
 load_test.scr full_test.scr autoload_test.scr   headless test scripts

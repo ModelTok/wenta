@@ -118,7 +118,7 @@ The modules `venti` proved out are all in C# now (library half done in
 | `sound` (regenerated noise, room equation, NC) | `Sound.cs` | ✓ | #48 |
 | `fan` (curves, duty point, power) | `Fan.cs` | ✓ | #50 |
 | `insulation` (condensation / heat-loss thickness) | `Insulation.cs` | ✓ | #51 |
-| `standards` (EN / ASHRAE / DIN tables) | `Standards.cs` | ✓ | #52 |
+| `standards` (EN / ASHRAE / DIN tables) | `Standards.cs` | ✓ (#52) | — |
 | `analysis` / `marking` | `Analysis.cs` `Marking.cs` | ✓ | #59 |
 | `results` / `settings` / `electrical` | `Results.cs` `Settings.cs` `Electrical.cs` | ✓ | — |
 | `re` (Re/size ζ corrections) | `ReCorrections.cs` | ✓ | #21 |
