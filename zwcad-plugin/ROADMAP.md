@@ -73,8 +73,9 @@ Port the entire wenta library surface to `csharp/Wenta.Core`
 
 > Phase 1 done: all 13 modules ported, **551/551 parity green** (vectors + inline catalog/bom/balancing/room runner).
 
-Deliverables: `csharp/` tree, `tools/gen_vectors.py`, console parity
-runner `Wenta.Core.Tests`, `build.cmd`, **parity green on this machine**.
+Deliverables: `csharp/` tree, frozen CSV vectors, console test runner
+`Wenta.Core.Tests` (857 assertions after #64), `build.cmd`, CI on
+`windows-latest`.
 
 ## Phase 2 — Plugin becomes real (drawing ⇄ math) 
 
