@@ -54,6 +54,8 @@ namespace Wenta.Core.Tests
             RunNetworkJson();
             RunResolve();
             RunCatalogMerge(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "catalogs"));
+            RunKnrMap();
+            RunBomExport();
 
             Console.WriteLine();
             Console.WriteLine("==== " + _pass + " passed, " + _fail + " failed ====");
@@ -1863,6 +1865,159 @@ namespace Wenta.Core.Tests
                 ZetaCatalog.Parse("{\"name\":\"v99\",\"version\":99,\"fittings\":[]}", "inline-v99"));
             ExpectError(true, "catmerge.err_bool_zeta", () =>
                 ZetaCatalog.Parse("{\"name\":\"b\",\"version\":1,\"fittings\":[{\"id\":\"x\",\"zeta\":true}]}", "inline-bool"));
+        }
+
+        // ---- KNR estimate-code mapping, configurable per edition (issue #54) ----
+        // The default map must reproduce the pre-#54 codes byte for byte; a file
+        // swaps them without a rebuild; anything the file does not cover is
+        // reported in Unmapped, never invented.
+        private static void RunKnrMap()
+        {
+            // Same tee network as RunBom (round duct, tee, round d2, flex, 2 terminals, source).
+            var net = new Network { Name = "knr-tee" };
+            net.Add("ahu", new Source("AHU"));
+            net.Add("duct", new RigidDuct("duct", new Round(0.315), 20.0));
+            net.Add("tee", new Tee("tee", new Round(0.315), 0.1, 0.4));
+            net.Add("d2", new RigidDuct("d2", new Round(0.2), 5.0));
+            net.Add("flex", new FlexDuct("flex", 0.125, 3.0, 2.0, 100.0));
+            net.Add("t1", new Terminal("t1", 0.06));
+            net.Add("t2", new Terminal("t2", 0.04));
+            net.Connect("ahu", "duct");
+            net.Connect("duct", "tee");
+            net.Connect("tee.straight", "d2");
+            net.Connect("tee.branch", "flex");
+            net.Connect("d2", "t1");
+            net.Connect("flex", "t2");
+            net.Solve();
+
+            // Default map == the legacy Bom.KnrMap dictionary; no overrides; nothing unmapped.
+            KnrMap def = KnrMap.Default();
+            CheckStr("knr.default_duct", def.CodeFor("duct"), Bom.KnrMap["duct"]);
+            CheckStr("knr.default_fitting_any_shape", def.CodeFor("fitting", "round", "tee"), "KNR 2-08 0301 (configure)");
+            CheckStr("knr.default_source_empty", def.CodeFor("source"), "");
+            CheckInt("knr.default_overrides", def.Overrides.Count, 0);
+            CheckTrue("knr.default_unknown_null", def.CodeFor("nonsense", "round") == null);
+            CheckStr("knr.default_unknown_listed", def.Unmapped[0], "nonsense shape=round");
+
+            Bom legacy = Bom.Build(net);
+            Bom explicitDefault = Bom.Build(net, KnrMap.Default());
+            CheckStr("knr.default_bom_csv_identical", explicitDefault.ToCsv(), legacy.ToCsv());
+            CheckStr("knr.default_bom_duct_code", FindBom(legacy, "duct").KnrCode, "KNR 2-08 0101 (configure)");
+            CheckInt("knr.default_bom_unmapped", legacy.Unmapped.Count, 0);
+            CheckStr("knr.default_bom_origin", legacy.Mapping.Origin, "default");
+
+            // Shipped example file: codes come from the file, overrides pick by shape/type.
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "catalogs", "knr-example.json");
+            KnrMap file = KnrMap.Load(path);
+            CheckStr("knr.file_edition", file.Edition, "KNR 2-08 example (configure per your edition)");
+            CheckInt("knr.file_version", file.Version, 1);
+            CheckInt("knr.file_codes", file.Codes.Count, 5);        // "_comment" key skipped
+            CheckInt("knr.file_overrides", file.Overrides.Count, 3);
+            Bom fromFile = Bom.Build(net, file);
+            CheckStr("knr.file_duct_round", FindBom(fromFile, "duct").KnrCode, "2-08 01xx-A (placeholder: round sheet-metal duct)");
+            CheckStr("knr.file_tee_override", FindBom(fromFile, "tee").KnrCode, "2-08 03xx-T (placeholder: tee / branch piece)");
+            CheckStr("knr.file_flex", FindBom(fromFile, "flex").KnrCode, "2-08 02xx-A (placeholder: flexible duct)");
+            CheckStr("knr.file_terminal", FindBom(fromFile, "t1").KnrCode, "2-08 04xx-A (placeholder: air terminal)");
+            CheckStr("knr.file_source_empty", FindBom(fromFile, "ahu").KnrCode, "");
+            CheckInt("knr.file_unmapped", fromFile.Unmapped.Count, 0);
+            CheckTrue("knr.file_csv_differs", fromFile.ToCsv() != legacy.ToCsv());
+
+            // Rectangular duct + rectangular in-line fitting hit the shape overrides;
+            // a round in-line fitting falls through to codes["fitting"].
+            var rect = new Network { Name = "knr-rect" };
+            rect.Add("src", new Source("src"));
+            rect.Add("rd", new RigidDuct("rd", new Rectangular(0.4, 0.2), 4.0));
+            rect.Add("damp", new TwoPortFitting("damp", new Rectangular(0.4, 0.2), 0.3));
+            rect.Add("rd2", new RigidDuct("rd2", new Rectangular(0.4, 0.2), 4.0));
+            rect.Add("el", new TwoPortFitting("el", new Round(0.315), 0.2));
+            rect.Add("out", new Terminal("out", 0.2));
+            rect.Connect("src", "rd");
+            rect.Connect("rd", "damp");
+            rect.Connect("damp", "rd2");
+            rect.Connect("rd2", "el");
+            rect.Connect("el", "out");
+            rect.Solve();
+            Bom rectBom = Bom.Build(rect, file);
+            CheckStr("knr.file_duct_rect_override", FindBom(rectBom, "rd").KnrCode, "2-08 01xx-B (placeholder: rectangular sheet-metal duct)");
+            CheckStr("knr.file_inline_rect_override", FindBom(rectBom, "damp").KnrCode, "2-08 03xx-R (placeholder: rectangular in-line fitting)");
+            CheckStr("knr.file_inline_round_base", FindBom(rectBom, "el").KnrCode, "2-08 03xx-A (placeholder: generic fitting)");
+
+            // Missing kinds: empty code in the row + reported once per distinct query.
+            KnrMap partial = KnrMap.Parse(
+                "{\"schema_version\":1,\"edition\":\"partial\",\"codes\":{\"duct\":\"D-1\",\"source\":\"\"}," +
+                " \"overrides\":[{\"match\":{\"kind\":\"fitting\",\"type\":\"tee\"},\"code\":\"T-1\"}]}", "inline-partial");
+            Bom partialBom = Bom.Build(net, partial);
+            CheckStr("knr.partial_duct", FindBom(partialBom, "duct").KnrCode, "D-1");
+            CheckStr("knr.partial_tee_via_override_only", FindBom(partialBom, "tee").KnrCode, "T-1");
+            CheckStr("knr.partial_flex_empty", FindBom(partialBom, "flex").KnrCode, "");
+            CheckStr("knr.partial_terminal_empty", FindBom(partialBom, "t2").KnrCode, "");
+            CheckInt("knr.partial_unmapped_count", partialBom.Unmapped.Count, 2);   // flex, terminal (2 terminals -> 1 entry)
+            CheckStr("knr.partial_unmapped_flex", partialBom.Unmapped[0], "flex shape=round");
+            CheckStr("knr.partial_unmapped_terminal", partialBom.Unmapped[1], "terminal");
+            CheckInt("knr.partial_map_unmapped_count", partial.Unmapped.Count, 2);
+            // An override naming a shape never matches a call without one.
+            CheckTrue("knr.partial_override_needs_type", partial.CodeFor("fitting") == null);
+            CheckStr("knr.partial_unmapped_fitting", partial.Unmapped[2], "fitting");
+
+            // Malformed input is rejected, never silently ignored.
+            try
+            {
+                KnrMap.Parse("{\"schema_version\":2,\"edition\":\"future\",\"codes\":{}}", "inline-v2");
+                Fail("knr.err_schema_version_2", "expected WentaException, got success");
+            }
+            catch (WentaException e)
+            {
+                CheckTrue("knr.err_schema_version_2", Contains(e.Message, "schema_version 2") && Contains(e.Message, "schema_version 1"));
+            }
+            ExpectError(true, "knr.err_schema_version_string", () => KnrMap.Parse("{\"schema_version\":\"1\",\"codes\":{}}", "inline"));
+            ExpectError(true, "knr.err_codes_not_object", () => KnrMap.Parse("{\"schema_version\":1,\"codes\":\"2-08\"}", "inline"));
+            ExpectError(true, "knr.err_codes_missing", () => KnrMap.Parse("{\"schema_version\":1}", "inline"));
+            ExpectError(true, "knr.err_code_not_string", () => KnrMap.Parse("{\"schema_version\":1,\"codes\":{\"duct\":101}}", "inline"));
+            ExpectError(true, "knr.err_override_no_kind", () => KnrMap.Parse(
+                "{\"schema_version\":1,\"codes\":{},\"overrides\":[{\"match\":{\"shape\":\"round\"},\"code\":\"x\"}]}", "inline"));
+            ExpectError(true, "knr.err_override_no_code", () => KnrMap.Parse(
+                "{\"schema_version\":1,\"codes\":{},\"overrides\":[{\"match\":{\"kind\":\"duct\"}}]}", "inline"));
+            ExpectError(true, "knr.err_not_json", () => KnrMap.Parse("not json", "inline"));
+            ExpectOk("knr.ok_version_omitted", () => KnrMap.Parse("{\"codes\":{\"duct\":\"D\"}}", "inline"));
+        }
+
+        // ---- BomExport (issue #29) — JSON + dependency-free XLSX of a BOM ----
+        private static void RunBomExport()
+        {
+            Network net = TeeNetwork();
+            net.Solve();
+            Bom bom = Bom.Build(net);
+
+            string json = BomExport.ToJson(bom, "bom-tee");
+            var ser = new System.Web.Script.Serialization.JavaScriptSerializer();
+            var root = ser.Deserialize<Dictionary<string, object>>(json);
+            CheckInt("bomx.schema_version", Convert.ToInt32(root["schema_version"]), 1);
+            CheckStr("bomx.network", (string)root["network"], "bom-tee");
+            var rows = (System.Collections.ArrayList)root["rows"];
+            CheckInt("bomx.row_count", rows.Count, bom.Rows.Count);
+            CheckInt("bomx.row_count_7", rows.Count, 7);
+            var totals = (Dictionary<string, object>)root["totals"];
+            Check("bomx.total_length", Convert.ToDouble(totals["length"], CultureInfo.InvariantCulture), bom.TotalLength, 1e-12);
+            Check("bomx.total_area", Convert.ToDouble(totals["area"], CultureInfo.InvariantCulture), bom.TotalArea, 1e-12);
+            Check("bomx.total_length_28", bom.TotalLength, 28.0, 1e-12);
+            var first = (Dictionary<string, object>)rows[0];
+            CheckStr("bomx.first_item", (string)first["item_id"], bom.Rows[0].ItemId);
+            CheckTrue("bomx.first_has_knr_key", first.ContainsKey("knr_code"));
+            CheckTrue("bomx.null_network", BomExport.ToJson(bom).Contains("\"network\":null"));
+            ExpectError(true, "bomx.err_null_bom", () => BomExport.ToJson(null));
+
+            byte[] xlsx = BomExport.ToXlsx(bom);
+            CheckTrue("bomx.xlsx_signature", xlsx.Length > 4 && xlsx[0] == 0x50 && xlsx[1] == 0x4B && xlsx[2] == 3 && xlsx[3] == 4);
+            string text = System.Text.Encoding.UTF8.GetString(xlsx);
+            foreach (string part in new[] { "[Content_Types].xml", "_rels/.rels", "xl/workbook.xml",
+                                            "xl/_rels/workbook.xml.rels", "xl/worksheets/sheet1.xml" })
+                CheckTrue("bomx.xlsx_part_" + part.Replace('/', '_'), text.Contains(part));
+            CheckTrue("bomx.xlsx_totals_row", text.Contains("<row r=\"9\""));
+            CheckTrue("bomx.xlsx_no_extra_row", !text.Contains("<row r=\"10\""));
+            CheckTrue("bomx.xlsx_total_label", text.Contains("TOTAL"));
+            CheckTrue("bomx.xlsx_sheet_name", text.Contains("name=\"BOM\""));
+            CheckTrue("bomx.xlsx_sheet_name_sanitised",
+                System.Text.Encoding.UTF8.GetString(BomExport.ToXlsx(bom, "a/b:c")).Contains("name=\"a_b_c\""));
         }
     }
 }

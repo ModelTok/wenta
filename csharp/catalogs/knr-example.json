@@ -1,0 +1,30 @@
+{
+  "_comment": "Example KNR estimate-code mapping for Wenta.KnrMap (issue #54). EVERY CODE BELOW IS A PLACEHOLDER, NOT A REAL KNR POSITION: configure per your KNR edition (KNR 2-08 or equivalent) before using for estimates. Keys starting with '_' are ignored by the parser.",
+  "schema_version": 1,
+  "_schema_version": "Integer. This build accepts 1; a newer value is rejected with an error naming both versions.",
+  "edition": "KNR 2-08 example (configure per your edition)",
+  "_edition": "Free-text label of the KNR edition these codes come from; shown in error messages and available as KnrMap.Edition.",
+  "codes": {
+    "_comment": "Item kind -> code. Kinds emitted by Bom: duct, flex, fitting, terminal, source. An empty string means 'deliberately no position' (not reported as unmapped); a kind that is absent leaves the BOM row's code empty AND lists the kind in Bom.Unmapped / KnrMap.Unmapped.",
+    "duct": "2-08 01xx-A (placeholder: round sheet-metal duct)",
+    "flex": "2-08 02xx-A (placeholder: flexible duct)",
+    "fitting": "2-08 03xx-A (placeholder: generic fitting)",
+    "terminal": "2-08 04xx-A (placeholder: air terminal)",
+    "source": ""
+  },
+  "overrides": [
+    {
+      "_comment": "Overrides are checked before 'codes', in this order; the first match wins. 'match.kind' is required; 'shape' (round | rectangular) and 'type' (tee | inline | component class name) are optional and must equal the BOM item's value exactly when present.",
+      "match": { "kind": "duct", "shape": "rectangular" },
+      "code": "2-08 01xx-B (placeholder: rectangular sheet-metal duct)"
+    },
+    {
+      "match": { "kind": "fitting", "type": "tee" },
+      "code": "2-08 03xx-T (placeholder: tee / branch piece)"
+    },
+    {
+      "match": { "kind": "fitting", "shape": "rectangular", "type": "inline" },
+      "code": "2-08 03xx-R (placeholder: rectangular in-line fitting)"
+    }
+  ]
+}
