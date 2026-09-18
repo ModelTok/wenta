@@ -2,32 +2,30 @@
 
 **Decision (2026-09): C# is the language of the stack.** Every CAD/BIM
 plugin host — ZWCAD, AutoCAD, BricsCAD, Revit, Civil 3D — speaks .NET.
-`wenta`/`venti` stop being *the product's runtime* and become **the math
-oracle**: `python/wenta` (+`wentamojo`) stays the verified reference and
-generates parity vectors; **all shipping code is C#**.
+**All code is C#.** The Python `wenta` reference, its Mojo port and the
+Rust `venti` library served as the math oracle while `Wenta.Core` was
+ported; once every module had a C# counterpart with tests they were
+removed from the repo (issue #64, git tag `legacy-py-mojo-rust`).
 
 ```
-python/wenta + wentamojo (oracle, unchanged)     ← runs on Linux/CI only
-        │  gen_vectors.py → CSV vectors (formula-transcribed, test-anchored)
-        ▼
 csharp/Wenta.Core (pure C#, net48, zero deps)    ← ALL engineering math
-        │                                ▲
-        ▼                                │
-zwcad-plugin (WentaZwcad.dll, ZWCAD 2021) ── parity suite runs here
+        │  Wenta.Core.Tests: frozen CSV parity vectors + closed-form tests
+        ▼
+zwcad-plugin (WentaZwcad.dll, ZWCAD 2021)        ← core compiled in, one DLL
 ```
 
 Ground rules:
 
 - **No runtime Python/Mojo/Rust/WASM in the plugin.** One DLL (`Wenta.Core.dll`)
   next to one plugin DLL. No FFI, no cdylib staging, no Wasmtime.
-- **Every engineering function lands in `Wenta.Core` with vectors first.**
-  Vectors are transcribed from the canonical formula source (wentamojo,
-  which is parity-tested against python/wenta) and spot-anchored to
-  `python/tests` expectations. Full Python-oracle vector generation runs
-  on CI (mojo wheels are Linux/macOS-only — the Windows dev box cannot run
-  the oracle).
-- C# never invents math: a new feature = new Mojo/Python kernels or
-  vectors, then the C# port, then the parity suite goes green.
+- **Every engineering function lands in `Wenta.Core` with tests first.**
+  The CSV vectors generated from the old oracle are frozen golden
+  fixtures; new work is covered by closed-form tests in
+  `Wenta.Core.Tests/Program.cs` citing the standard/correlation it
+  implements. `.github/workflows/csharp.yml` runs the suite on
+  `windows-latest`.
+- C# never invents math: a new feature = a cited formula/table + its
+  tests, then the C# implementation, then the suite goes green.
 - Everything learned about ZWCAD 2021 (API DLLs, registry install, CUIX
   ribbon, evidence-log testing) stays the deployment layer — see README.
 
@@ -108,20 +106,24 @@ Where Ventpack wins today; a full phase, not an afterthought:
 
 ## Phase 4 — Beyond-wenta engineering (C# ports of venti's feature set)
 
-Port, with vectors, the modules `venti` proved out — now in C#:
-sound (`sound`), balancing (damper ζ/open-% — the "VentPack-style" one),
-fan selection (curves, duty point), insulation (EN ISO 12241), room
-balance/ACH, per-branch analysis, marking. Each: vectors → C# → plugin
-command (`WENTASOUND`, `WENTABALANCE`, `WENTAFAN`, `WENTAInsulate`…).
+The modules `venti` proved out are all in C# now (library half done in
+#64); what remains per module is the plugin command
+(`WENTASOUND`, `WENTABALANCE`, `WENTAFAN`, `WENTAINSULATE`, …).
 
-| venti module | C# file | Status |
-|---|---|---|
-| **`Balancing`** (damper ζ/open-%, branch surplus-Δ logic) | `Balancing.cs` | port ✓ |
-| **`Room`** (balance/ACH, RoomBalanceSet + CSV) | `Room.cs` | port ✓ |
-| `Sound` | — | to port |
-| `Fan` (curves, duty point) | — | to port |
-| `Insulation` (EN ISO 12241) | — | to port |
-| `Analysis` / `Marking` | — | to port |
+| former venti module | C# file | Library | Plugin command |
+|---|---|---|---|
+| `balancing` (damper ζ/open-%, branch surplus-Δ) | `Balancing.cs` | ✓ | #49 |
+| `room` (balance/ACH, RoomBalanceSet + CSV) | `Room.cs` | ✓ | #26 |
+| `sound` (regenerated noise, room equation, NC) | `Sound.cs` | ✓ | #48 |
+| `fan` (curves, duty point, power) | `Fan.cs` | ✓ | #50 |
+| `insulation` (condensation / heat-loss thickness) | `Insulation.cs` | ✓ | #51 |
+| `standards` (EN / ASHRAE / DIN tables) | `Standards.cs` | ✓ | #52 |
+| `analysis` / `marking` | `Analysis.cs` `Marking.cs` | ✓ | #59 |
+| `results` / `settings` / `electrical` | `Results.cs` `Settings.cs` `Electrical.cs` | ✓ | — |
+| `re` (Re/size ζ corrections) | `ReCorrections.cs` | ✓ | #21 |
+| `topology` (polylines → network, flatten) | `Topology.cs` | ✓ | #19 |
+| `clash` (segment clearance) | `Clash.cs` | ✓ | #60 |
+| `fabrication` / `development` | `Fabrication.cs` `Development.cs` | ✓ | #29 |
 
 ## Phase 5 — PL-market items (item 3 of the competitive review)
 
@@ -165,4 +167,4 @@ IFC export (C# toolkit — no Python side), BIM views. After M3.
 - Runtime Python/Rust/WASM anywhere in the shipped plugin.
 - Certified vendor loss data (we ship the *format*).
 - Native Revit integration (later, cheaply — C# API is shared).
-- Linux support (the oracle lives there; the product lives in ZWCAD).
+- Linux support (the product lives in ZWCAD; CI runs on `windows-latest`).

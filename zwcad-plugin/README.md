@@ -18,7 +18,7 @@ Mojo, Rust or WASM at runtime.
 ## UI
 
 - **Ribbon tab "Wenta"** — partial CUIX (`Wenta.CUIX`, built by
-  `make_cuix.py`, modeled 1:1 on ZWSOFT's own `APP+.cuix` package format).
+  `tools/MakeCuix.cs`, modeled 1:1 on ZWSOFT's own `APP+.cuix` package format).
   Buttons: Duct Section · Wenta Panel · Plugin Info · Fitting Catalog ·
   BOM + KNR. Load once with `MENULOAD`; verified live in the ZWCAD UI tree
   (`Wenta [ControlType.TabItem]`, see `uia-check.ps1`).
@@ -64,7 +64,7 @@ WENTAHELLO ok  ZWCAD 21.10.21.0
 ```
 WentaZwcad/        plugin sources (Commands, Plugin, WentaPanel)
 ../csharp/         Wenta.Core + parity suite + vector generator + catalogs
-make_cuix.py       CUIX ribbon package builder
+tools/MakeCuix.cs  CUIX ribbon package builder
 build.cmd install.ps1 uninstall.ps1   build & deploy
 load_test.scr full_test.scr autoload_test.scr   headless test scripts
 uia-check.ps1      UI-tree verification (ribbon tab presence)
