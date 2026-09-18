@@ -14,7 +14,7 @@
 
 $ErrorActionPreference = 'Stop'
 
-$bin = 'C:\Users\amd\Documents\GitHub\pyduct\zwcad-plugin\bin'
+$bin = Join-Path $PSScriptRoot 'bin'
 $installDir = 'C:\ProgramData\WentaZwcad'
 
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()

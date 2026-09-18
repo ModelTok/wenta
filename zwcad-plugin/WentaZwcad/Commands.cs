@@ -92,8 +92,11 @@ namespace WentaZwcad
                 if (round)
                 {
                     Wenta.Round rs = (Wenta.Round)r.Section;
-                    outline = new Circle(Point3d.Origin, Vector3d.ZAxis, rs.Diameter);
-                    label = string.Format("Ø{0} mm", Math.Round(rs.Diameter * 1000));
+                    // Drawing units are mm and the section sits in the 0..D square,
+                    // like the rectangle below (the label is placed at top = D mm).
+                    double d = rs.Diameter * 1000.0;
+                    outline = new Circle(new Point3d(d / 2.0, d / 2.0, 0), Vector3d.ZAxis, d / 2.0);
+                    label = string.Format("Ø{0} mm", Math.Round(d));
                 }
                 else
                 {
