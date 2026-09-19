@@ -61,7 +61,10 @@ rem ---- Wenta.Core.dll ----
   "%ROOT%Wenta.Core\BomExport.cs" ^
   "%ROOT%Wenta.Core\PressureReport.cs" ^
   "%ROOT%Wenta.Core\BatchSizing.cs" ^
-  "%ROOT%Wenta.Core\IfcExport.cs"
+  "%ROOT%Wenta.Core\IfcExport.cs" ^
+  "%ROOT%Wenta.Core\MultiDrawing.cs" ^
+  "%ROOT%Wenta.Core\ReFit.cs" ^
+  "%ROOT%Wenta.Core\QuickConnect.cs"
 if errorlevel 1 ( echo BUILD FAILED: Wenta.Core & exit /b 1 )
 
 rem ---- Wenta.Core.Tests.exe ----

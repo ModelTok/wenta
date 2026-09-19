@@ -72,7 +72,10 @@ if not exist "%OUT%" mkdir "%OUT%"
   "%CORE%\BomExport.cs" ^
   "%CORE%\PressureReport.cs" ^
   "%CORE%\BatchSizing.cs" ^
-  "%CORE%\IfcExport.cs"
+  "%CORE%\IfcExport.cs" ^
+  "%CORE%\MultiDrawing.cs" ^
+  "%CORE%\ReFit.cs" ^
+  "%CORE%\QuickConnect.cs"
 
 if errorlevel 1 ( echo BUILD FAILED & exit /b 1 )
 

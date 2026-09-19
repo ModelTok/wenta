@@ -59,6 +59,9 @@ namespace Wenta.Core.Tests
             RunPressureReport();
             RunBatchSizing();
             RunIfcExport();
+            RunMultiDrawing();
+            RunReFit();
+            RunQuickConnect();
 
             Console.WriteLine();
             Console.WriteLine("==== " + _pass + " passed, " + _fail + " failed ====");
@@ -2179,6 +2182,325 @@ namespace Wenta.Core.Tests
             CheckInt("ifc.single_segments", CountOf(single, "IFCDUCTSEGMENT("), 1);
             CheckInt("ifc.single_fittings", CountOf(single, "IFCDUCTFITTING("), 0);
             CheckInt("ifc.single_terminals", CountOf(single, "IFCAIRTERMINAL("), 1);
+        }
+
+        // ---- Multi-storey / multi-drawing networks (issue #55) ----
+        // A riser drawing (Source + riser duct + riser tee) feeds two storey
+        // drawings through cross-drawing links off the tee legs; the merged
+        // network must solve exactly like the same components drawn on one sheet.
+        private static void RunMultiDrawing()
+        {
+            const string gTee = "11111111-1111-1111-1111-111111111111";
+            const string gL1 = "22222222-2222-2222-2222-222222222222";
+            const string gL2 = "33333333-3333-3333-3333-333333333333";
+
+            var riser = new Network { Name = "riser" };
+            riser.Add("ahu", new Source("AHU"));
+            riser.Add("rd", new RigidDuct("riser duct", new Round(0.315), 6.0));
+            riser.Add("tee", new Tee("riser tee", new Round(0.315), 0.1, 0.4));
+            riser.Connect("ahu", "rd");
+            riser.Connect("rd", "tee");
+            string riserJson = NetworkJson.Serialize(riser,
+                new Dictionary<string, ComponentMeta> { { "tee", new ComponentMeta { Guid = gTee } } });
+
+            var l1 = new Network { Name = "L1" };
+            l1.Add("d", new RigidDuct("L1 duct", new Round(0.2), 5.0));
+            l1.Add("t", new Terminal("L1 diffuser", 0.06));
+            l1.Connect("d", "t");
+            string l1Json = NetworkJson.Serialize(l1,
+                new Dictionary<string, ComponentMeta> { { "d", new ComponentMeta { Guid = gL1 } } });
+
+            var l2 = new Network { Name = "L2" };
+            l2.Add("d", new RigidDuct("L2 duct", new Round(0.125), 4.0));
+            l2.Add("t", new Terminal("L2 diffuser", 0.04));
+            l2.Connect("d", "t");
+            string l2Json = NetworkJson.Serialize(l2,
+                new Dictionary<string, ComponentMeta> { { "d", new ComponentMeta { Guid = gL2 } } });
+
+            Func<DrawingDocument[]> load = () => new DrawingDocument[]
+            {
+                MultiDrawing.LoadDocument(riserJson, "riser"),
+                MultiDrawing.LoadDocument(l1Json, "L1"),
+                MultiDrawing.LoadDocument(l2Json, "L2")
+            };
+            Func<DrawingLink[]> goodLinks = () => new DrawingLink[]
+            {
+                new DrawingLink { FromGuid = gTee, FromPort = "straight", ToGuid = gL1 },
+                new DrawingLink { FromGuid = gTee, FromPort = "branch", ToGuid = gL2 }
+            };
+            Func<List<string>, string, bool> has = (list, needle) =>
+            {
+                foreach (string s in list) if (s.Contains(needle)) return true;
+                return false;
+            };
+
+            DrawingDocument[] docs = load();
+            CheckInt("multi.riser_count", docs[0].Network.Components.Count, 3);
+            CheckStr("multi.riser_guid_kept", docs[0].Meta["tee"].Guid, gTee);
+            CheckStr("multi.riser_scope_stamped", docs[0].Meta["tee"].DrawingScope, "riser");
+            CheckStr("multi.l1_scope_stamped", docs[1].Meta["d"].DrawingScope, "L1");
+            CheckTrue("multi.guid_kept_for_unnamed", docs[0].Meta["ahu"].Guid != null
+                && docs[0].Meta["ahu"].Guid.Length >= 32);
+
+            // A drawing exported without guid/scope gets both on load.
+            string bare = "{\"schema_version\":1,\"name\":\"bare\",\"components\":"
+                + "[{\"id\":\"t\",\"wenta_class\":\"Terminal\",\"flowrate\":0.05}],\"connections\":[]}";
+            DrawingDocument bareDoc = MultiDrawing.LoadDocument(bare, "L9");
+            CheckTrue("multi.guid_generated", bareDoc.Meta["t"].Guid != null
+                && bareDoc.Meta["t"].Guid.Length >= 32);
+            CheckStr("multi.scope_generated", bareDoc.Meta["t"].DrawingScope, "L9");
+            string scopedJson = NetworkJson.Serialize(l1, new Dictionary<string, ComponentMeta>
+                { { "d", new ComponentMeta { Guid = gL1, DrawingScope = "Model" } } });
+            CheckStr("multi.scope_preserved",
+                MultiDrawing.LoadDocument(scopedJson, "L1").Meta["d"].DrawingScope, "Model");
+            ExpectError(true, "multi.err_no_scope", () => MultiDrawing.LoadDocument(bare, ""));
+
+            // Merge: scoped ids, rebuilt intra-drawing wiring, links off the tee legs.
+            Dictionary<string, ComponentMeta> mergedMeta;
+            Network merged = MultiDrawing.Merge(docs, goodLinks(), out mergedMeta);
+            CheckInt("multi.merged_count", merged.Components.Count, 7);
+            CheckTrue("multi.merged_id_riser", merged.Components.ContainsKey("riser/tee"));
+            CheckTrue("multi.merged_id_l1", merged.Components.ContainsKey("L1/d"));
+            CheckTrue("multi.merged_id_l2", merged.Components.ContainsKey("L2/t"));
+            CheckStr("multi.merged_name", merged.Name, "riser+L1+L2");
+            CheckInt("multi.merged_meta_count", mergedMeta.Count, 7);
+            CheckStr("multi.merged_meta_guid", mergedMeta["L1/d"].Guid, gL1);
+            CheckStr("multi.merged_meta_scope", mergedMeta["L2/d"].DrawingScope, "L2");
+            CheckInt("multi.merged_structurally_valid", merged.Validate().Count, 0);
+
+            // The key check: identical to the same network drawn on one sheet.
+            var flat = new Network { Name = "flat" };
+            flat.Add("ahu", new Source("AHU"));
+            flat.Add("rd", new RigidDuct("riser duct", new Round(0.315), 6.0));
+            flat.Add("tee", new Tee("riser tee", new Round(0.315), 0.1, 0.4));
+            flat.Add("d1", new RigidDuct("L1 duct", new Round(0.2), 5.0));
+            flat.Add("t1", new Terminal("L1 diffuser", 0.06));
+            flat.Add("d2", new RigidDuct("L2 duct", new Round(0.125), 4.0));
+            flat.Add("t2", new Terminal("L2 diffuser", 0.04));
+            flat.Connect("ahu", "rd");
+            flat.Connect("rd", "tee");
+            flat.Connect("tee.straight", "d1");
+            flat.Connect("d1", "t1");
+            flat.Connect("tee.branch", "d2");
+            flat.Connect("d2", "t2");
+            double dpFlat = flat.Solve();
+            double dpMerged = merged.Solve();
+            Check("multi.dp_matches_single_drawing", dpMerged, dpFlat, 1e-12);
+            Check("multi.dp_value", dpMerged, 5.8375402667641145, 1e-12);
+            Check("multi.riser_flow", merged.Components["riser/rd"].Port_("inlet").Flowrate ?? 0.0, 0.10, 1e-12);
+            Check("multi.straight_flow", merged.Components["riser/tee"].Port_("straight").Flowrate ?? 0.0, 0.06, 1e-12);
+            Check("multi.branch_flow", merged.Components["riser/tee"].Port_("branch").Flowrate ?? 0.0, 0.04, 1e-12);
+
+            // The merged assembly round-trips as ordinary network JSON.
+            string json = MultiDrawing.ToJson(merged, mergedMeta);
+            Dictionary<string, ComponentMeta> backMeta;
+            Network back = NetworkJson.Parse(json, out backMeta);
+            CheckInt("multi.json_count", back.Components.Count, 7);
+            Check("multi.json_dp", back.Solve(), dpMerged, 1e-12);
+            CheckStr("multi.json_guid", backMeta["L2/d"].Guid, gL2);
+            CheckStr("multi.json_scope", backMeta["riser/tee"].DrawingScope, "riser");
+
+            // Validate: clean set, then one defect at a time.
+            CheckInt("multi.validate_ok", MultiDrawing.Validate(load(), goodLinks()).Count, 0);
+
+            DrawingDocument[] dup = load();
+            dup[2].Meta["d"].Guid = gTee;
+            List<string> dupProblems = MultiDrawing.Validate(dup, goodLinks());
+            CheckTrue("multi.validate_duplicate_guid", has(dupProblems, "duplicate guid '" + gTee + "'"));
+            ExpectError(true, "multi.err_duplicate_guid", () =>
+            {
+                Dictionary<string, ComponentMeta> m;
+                MultiDrawing.Merge(dup, goodLinks(), out m);
+            });
+
+            var unknownLinks = new DrawingLink[]
+            {
+                new DrawingLink { FromGuid = gTee, FromPort = "straight", ToGuid = gL1 },
+                new DrawingLink { FromGuid = gTee, FromPort = "branch", ToGuid = "44444444-4444-4444-4444-444444444444" }
+            };
+            List<string> unknownProblems = MultiDrawing.Validate(load(), unknownLinks);
+            CheckTrue("multi.validate_unknown_guid",
+                has(unknownProblems, "unknown guid '44444444-4444-4444-4444-444444444444'"));
+            ExpectError(true, "multi.err_unknown_guid", () =>
+            {
+                Dictionary<string, ComponentMeta> m;
+                MultiDrawing.Merge(load(), unknownLinks, out m);
+            });
+
+            var onlyL1 = new DrawingLink[]
+                { new DrawingLink { FromGuid = gTee, FromPort = "straight", ToGuid = gL1 } };
+            List<string> orphan = MultiDrawing.Validate(load(), onlyL1);
+            CheckInt("multi.validate_orphan_count", orphan.Count, 1);
+            CheckTrue("multi.validate_orphan_storey", has(orphan, "drawing 'L2' has no Source and no incoming link"));
+
+            DrawingDocument[] sd = load();
+            var sameDocLinks = new DrawingLink[]
+                { new DrawingLink { FromGuid = sd[0].Meta["rd"].Guid, ToGuid = gTee } };
+            CheckTrue("multi.validate_same_document",
+                has(MultiDrawing.Validate(sd, sameDocLinks), "both ends in drawing 'riser'"));
+            ExpectError(true, "multi.err_same_document", () =>
+            {
+                Dictionary<string, ComponentMeta> m;
+                MultiDrawing.Merge(sd, sameDocLinks, out m);
+            });
+
+            var badPorts = new DrawingLink[]
+            {
+                new DrawingLink { FromGuid = gTee, FromPort = "combined", ToGuid = gL1 },
+                new DrawingLink { FromGuid = gTee, FromPort = "branch", ToGuid = gL2, ToPort = "outlet" }
+            };
+            List<string> portProblems = MultiDrawing.Validate(load(), badPorts);
+            CheckInt("multi.validate_port_count", portProblems.Count, 2);
+            CheckTrue("multi.validate_from_not_outlet", has(portProblems, "'riser/tee.combined', which is not an out-port"));
+            CheckTrue("multi.validate_to_not_inlet", has(portProblems, "'L2/d.outlet', which is not an in-port"));
+
+            var ambiguous = new DrawingLink[]
+            {
+                new DrawingLink { FromGuid = gTee, ToGuid = gL1 },
+                new DrawingLink { FromGuid = gTee, FromPort = "branch", ToGuid = gL2 }
+            };
+            CheckTrue("multi.validate_ambiguous_port",
+                has(MultiDrawing.Validate(load(), ambiguous), "out-ports; name one"));
+            ExpectError(true, "multi.err_ambiguous_port", () =>
+            {
+                Dictionary<string, ComponentMeta> m;
+                MultiDrawing.Merge(load(), ambiguous, out m);
+            });
+        }
+
+        // ---- ReFit (issue #27) — re-size ducts on edit + balancing hints ----
+        private static void RunReFit()
+        {
+            ReFitResult r = ReFit.Apply(TeeNetwork(), new ReFitOptions { TargetVelocity = 4.0 });
+            Check("refit.old_critical", r.OldCriticalDpPa, 7.6294978217990357, 1e-12);
+            Check("refit.new_critical", r.NewCriticalDpPa, 20.198176310792714, 1e-12);
+            CheckInt("refit.change_count", r.Changes.Count, 3);
+            CheckInt("refit.network_components", r.Network.Components.Count, 7);
+            CheckInt("refit.network_valid", r.Network.Validate().Count, 0);
+
+            ReFitChange duct = null, d2 = null, flex = null;
+            foreach (ReFitChange c in r.Changes)
+            {
+                if (c.ComponentId == "duct") duct = c;
+                if (c.ComponentId == "d2") d2 = c;
+                if (c.ComponentId == "flex") flex = c;
+            }
+            CheckTrue("refit.rows_present", duct != null && d2 != null && flex != null);
+            Check("refit.duct_old_d", duct.OldDiameterM, 0.315, 1e-12);
+            Check("refit.duct_new_d", duct.NewDiameterM, 0.2, 1e-12);
+            Check("refit.duct_new_v", duct.NewVelocityMs, 3.1830988618379066, 1e-12);
+            CheckTrue("refit.duct_changed", duct.Changed);
+            Check("refit.d2_new_d", d2.NewDiameterM, 0.15, 1e-12);
+            CheckTrue("refit.d2_changed", d2.Changed);
+            Check("refit.flex_same_d", flex.NewDiameterM, flex.OldDiameterM, 0.0);
+            CheckTrue("refit.flex_unchanged", !flex.Changed);
+
+            // Idempotent: re-fitting an already re-fitted network changes nothing.
+            ReFitResult again = ReFit.Apply(r.Network, new ReFitOptions { TargetVelocity = 4.0 });
+            Check("refit.idempotent_old", again.OldCriticalDpPa, r.NewCriticalDpPa, 0.0);
+            Check("refit.idempotent_new", again.NewCriticalDpPa, r.NewCriticalDpPa, 0.0);
+            bool anyChanged = false;
+            foreach (ReFitChange c in again.Changes) if (c.Changed) anyChanged = true;
+            CheckTrue("refit.idempotent_no_changes", !anyChanged);
+
+            string csv = r.ToCsv();
+            CheckStr("refit.csv_header", csv.Split('\n')[0],
+                "component_id,old_diameter_m,new_diameter_m,old_velocity_ms,new_velocity_ms,changed");
+            CheckInt("refit.csv_lines", csv.Split('\n').Length, 4);
+
+            // Balancing hints over the (unmodified) parity network.
+            Network net = TeeNetwork();
+            double critical = net.Solve();
+            List<BalancingHint> hints = ReFit.Hints(net);
+            CheckInt("refit.hint_count", hints.Count, 2);
+            BalancingHint t1 = null, t2 = null;
+            foreach (BalancingHint h in hints)
+            {
+                if (h.TerminalId == "t1") t1 = h;
+                if (h.TerminalId == "t2") t2 = h;
+            }
+            CheckTrue("refit.hints_present", t1 != null && t2 != null);
+            Check("refit.t2_is_critical", t2.AvailableDpPa, critical, 1e-12);
+            Check("refit.t2_no_surplus", t2.SurplusDpPa, 0.0, 0.0);
+            Check("refit.t2_zeta_zero", t2.DamperZeta, 0.0, 0.0);
+            Check("refit.t2_fully_open", t2.DamperOpenPercent, 100.0, 0.0);
+            Check("refit.t1_available", t1.AvailableDpPa, 3.0063159227848875, 1e-12);
+            Check("refit.t1_surplus", t1.SurplusDpPa, 4.6231818990141482, 1e-12);
+            Check("refit.t1_zeta", t1.DamperZeta, 2.10543449693368, 1e-12);
+            Check("refit.t1_open_pct", t1.DamperOpenPercent, 55.217922145866439, 1e-12);
+            foreach (BalancingHint h in hints)
+            {
+                Check("refit.balance_" + h.TerminalId, h.AvailableDpPa + h.SurplusDpPa, h.RequiredDpPa, 1e-9);
+                CheckTrue("refit.open_range_" + h.TerminalId,
+                    h.DamperOpenPercent > 0.0 && h.DamperOpenPercent <= 100.0);
+            }
+            CheckStr("refit.hint_csv_header", ReFit.HintsAsCsv(hints).Split('\n')[0],
+                "terminal_id,available_dp_pa,required_dp_pa,surplus_dp_pa,damper_zeta,damper_open_percent");
+
+            var noTerm = new Network { Name = "no-terminal" };
+            noTerm.Add("ahu", new Source("AHU"));
+            ExpectError(true, "refit.err_no_terminal", () => ReFit.Apply(noTerm));
+        }
+
+        // ---- QuickConnect (issue #57) — auto transitions, flexes and spacers ----
+        private static void RunQuickConnect()
+        {
+            var opts = new QuickConnectOptions { FlowrateM3s = 0.1 };
+            List<ConnectorPiece> plan = QuickConnect.Plan(new Round(0.315), new Round(0.2), opts);
+            CheckInt("qc.reducer_pieces", plan.Count, 1);
+            CheckTrue("qc.reducer_kind", plan[0].Kind == ConnectorKind.Reducer);
+            Check("qc.reducer_length", plan[0].LengthM, 0.43675586148169621, 1e-12);
+            Check("qc.reducer_zeta", plan[0].Zeta, 0.23997651801461317, 1e-12);
+            Check("qc.reducer_dp", plan[0].PressureDropPa, 1.4637452320667652, 1e-12);
+
+            plan = QuickConnect.Plan(new Round(0.2), new Round(0.315), opts);
+            CheckTrue("qc.expander_kind", plan[0].Kind == ConnectorKind.Expander);
+            Check("qc.expander_length", plan[0].LengthM, 0.43675586148169621, 1e-12);
+            Check("qc.expander_zeta", plan[0].Zeta, 0.21375642331622594, 1e-12);
+            Check("qc.expander_dp", plan[0].PressureDropPa, 1.3038148400574676, 1e-12);
+
+            plan = QuickConnect.Plan(new Round(0.2), new Rectangular(0.3, 0.15), opts);
+            CheckTrue("qc.transition_kind", plan[0].Kind == ConnectorKind.Transition);
+            Check("qc.transition_length", plan[0].LengthM, 0.37978770563625752, 1e-12);
+            Check("qc.transition_zeta", plan[0].Zeta, 0.054674682037962032, 1e-12);
+
+            // Same section with a gap: a plain spacer, no loss.
+            var gap = new QuickConnectOptions { FlowrateM3s = 0.1, GapM = 0.4 };
+            plan = QuickConnect.Plan(new Round(0.2), new Round(0.2), gap);
+            CheckInt("qc.spacer_pieces", plan.Count, 1);
+            CheckTrue("qc.spacer_kind", plan[0].Kind == ConnectorKind.Spacer);
+            Check("qc.spacer_length", plan[0].LengthM, 0.4, 1e-12);
+            Check("qc.spacer_zeta", plan[0].Zeta, 0.0, 0.0);
+            Check("qc.spacer_total_length", QuickConnect.TotalLengthM(plan), 0.4, 1e-12);
+
+            var flexOpts = new QuickConnectOptions { FlowrateM3s = 0.1, GapM = 0.8, PreferFlex = true };
+            plan = QuickConnect.Plan(new Round(0.2), new Round(0.2), flexOpts);
+            CheckInt("qc.flex_pieces", plan.Count, 1);
+            CheckTrue("qc.flex_kind", plan[0].Kind == ConnectorKind.Flex);
+            Check("qc.flex_length", plan[0].LengthM, 0.8, 1e-12);
+
+            var longGap = new QuickConnectOptions { FlowrateM3s = 0.1, GapM = 2.0, PreferFlex = true };
+            plan = QuickConnect.Plan(new Round(0.2), new Round(0.2), longGap);
+            CheckInt("qc.flex_capped_pieces", plan.Count, 2);
+            Check("qc.flex_capped_length", plan[0].LengthM, 1.5, 1e-12);
+            Check("qc.flex_capped_spacer", plan[1].LengthM, 0.5, 1e-12);
+            Check("qc.flex_capped_total", QuickConnect.TotalLengthM(plan), 2.0, 1e-12);
+
+            plan = QuickConnect.Plan(new Round(0.2), new Round(0.2), new QuickConnectOptions { FlowrateM3s = 0.1 });
+            CheckInt("qc.direct_pieces", plan.Count, 1);
+            CheckTrue("qc.direct_kind", plan[0].Kind == ConnectorKind.Direct);
+            Check("qc.direct_length", plan[0].LengthM, 0.0, 0.0);
+            Check("qc.direct_zeta", plan[0].Zeta, 0.0, 0.0);
+            Check("qc.direct_dp_total", QuickConnect.TotalPressureDropPa(plan), 0.0, 0.0);
+
+            CheckTrue("qc.csv_header", QuickConnect.ToCsv(plan).StartsWith("kind,"));
+            ExpectError(true, "qc.err_zero_flow", () =>
+                QuickConnect.Plan(new Round(0.2), new Round(0.15), new QuickConnectOptions { FlowrateM3s = 0.0 }));
+            ExpectError(true, "qc.err_negative_gap", () =>
+                QuickConnect.Plan(new Round(0.2), new Round(0.15), new QuickConnectOptions { FlowrateM3s = 0.1, GapM = -0.5 }));
+            ExpectError(true, "qc.err_bad_angle", () =>
+                QuickConnect.Plan(new Round(0.2), new Round(0.15),
+                    new QuickConnectOptions { FlowrateM3s = 0.1, MaxTaperAngleDeg = 90.0 }));
         }
     }
 }
