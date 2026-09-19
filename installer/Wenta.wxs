@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  WentaZwcad MSI (issue #36).
+
+  Packages the three files install.ps1 deploys - WentaZwcad.dll (Wenta.Core
+  compiled in), Wenta.CUIX and example-generic.json - into
+  C:\ProgramData\WentaZwcad, and writes the HKLM demand-load registration
+  ZWCAD 2021 needs (LOADCTRLS=14, MANAGED=1). Uninstall removes both.
+
+  The ribbon still has to be loaded once per ZWCAD profile with
+  _.MENULOAD C:\ProgramData\WentaZwcad\Wenta.CUIX - a partial CUIX cannot be
+  registered from outside the application, which is why install.ps1 prints
+  the same instruction.
+
+  Build: installer\build.cmd (needs the WiX 7 dotnet tool and the outputs of
+  zwcad-plugin\build.cmd).
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <Package Name="Wenta for ZWCAD 2021"
+           Manufacturer="ModelTok"
+           Version="$(var.ProductVersion)"
+           UpgradeCode="7d3b2f18-5c4a-4e0d-9a6b-2f1c8e5d4a30"
+           Scope="perMachine"
+           Compressed="yes">
+
+    <!-- Refuse a downgrade rather than silently installing older files. -->
+    <MajorUpgrade AllowDowngrades="no"
+                  DowngradeErrorMessage="A newer version of [ProductName] is already installed."
+                  Schedule="afterInstallInitialize" />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <Launch Condition="Installed OR ZWCAD2021INSTALLED"
+            Message="ZWCAD 2021 was not found on this machine. Install ZWCAD 2021 first, or run msiexec with ZWCAD2021INSTALLED=1 to override." />
+
+    <Feature Id="Main" Title="Wenta for ZWCAD 2021" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <!-- C:\ProgramData\WentaZwcad - the path install.ps1 and the loader use. -->
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="INSTALLFOLDER" Name="WentaZwcad" />
+    </StandardDirectory>
+  </Fragment>
+
+  <Fragment>
+    <!-- ZWCAD writes its own install path here; absence means ZWCAD 2021 is missing. -->
+    <Property Id="ZWCAD2021INSTALLED">
+      <RegistrySearch Id="ZwcadRoot"
+                      Root="HKLM"
+                      Key="SOFTWARE\ZWSOFT\ZWCAD\2021\en-US"
+                      Type="raw" />
+    </Property>
+
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+
+      <Component Id="PluginDll" Guid="1f9a4c62-0b73-4d18-8e5f-6c2a9d3b7e41">
+        <File Id="WentaZwcadDll"
+              Source="$(var.BinDir)\WentaZwcad.dll"
+              KeyPath="yes" />
+
+        <!-- Demand-load registration, identical to install.ps1:
+             LOADCTRLS 14 = 2 startup | 4 on-command | 8 manual; MANAGED 1 = .NET. -->
+        <RegistryKey Root="HKLM"
+                     Key="SOFTWARE\ZWSOFT\ZWCAD\2021\en-US\Applications\WentaZwcad"
+                     ForceCreateOnInstall="yes"
+                     ForceDeleteOnUninstall="yes">
+          <RegistryValue Type="string"  Name="DESCRIPTION" Value="Wenta duct plugin (ductwork sizing)" />
+          <RegistryValue Type="integer" Name="LOADCTRLS"   Value="14" />
+          <RegistryValue Type="string"  Name="LOADER"      Value="[INSTALLFOLDER]WentaZwcad.dll" />
+          <RegistryValue Type="integer" Name="MANAGED"     Value="1" />
+        </RegistryKey>
+      </Component>
+
+      <Component Id="RibbonCuix" Guid="3c8e5b04-6a29-4f7b-b1d3-0e94a75c2f68">
+        <File Id="WentaCuix" Source="$(var.BinDir)\Wenta.CUIX" KeyPath="yes" />
+      </Component>
+
+      <Component Id="ExampleCatalog" Guid="5a17d93e-8f42-4c06-9b8a-4d7e1f6b03c5">
+        <File Id="ExampleGenericJson" Source="$(var.BinDir)\example-generic.json" KeyPath="yes" />
+      </Component>
+
+      <!-- wenta.log lives beside the plugin; remove it on uninstall so nothing is left behind. -->
+      <Component Id="LogCleanup" Guid="9e64b2a7-1d05-483f-a27c-8b05e3f94d16">
+        <RegistryValue Root="HKLM"
+                       Key="SOFTWARE\ZWSOFT\ZWCAD\2021\en-US\Applications\WentaZwcad"
+                       Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+        <RemoveFile Id="RemoveWentaLog" Name="wenta.log" On="uninstall" />
+        <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
+      </Component>
+
+    </ComponentGroup>
+  </Fragment>
+</Wix>
