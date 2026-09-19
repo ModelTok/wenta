@@ -74,36 +74,44 @@ Port the entire wenta library surface to `csharp/Wenta.Core`
 > Phase 1 done: all 13 modules ported, **551/551 parity green** (vectors + inline catalog/bom/balancing/room runner).
 
 Deliverables: `csharp/` tree, frozen CSV vectors, console test runner
-`Wenta.Core.Tests` (857 assertions after #64), `build.cmd`, CI on
-`windows-latest`.
+`Wenta.Core.Tests` (1146 assertions), `build.cmd`, CI on `windows-latest`.
 
-## Phase 2 — Plugin becomes real (drawing ⇄ math) 
+## Phase 2 — Plugin becomes real (drawing ⇄ math)
 
-- `WENTADUCT` sizes via `Sizing` (flow prompt → velocity/EF/NC method →
-  EN size → drawn polyline + label with flow/velocity/Δp/m; XData carries
-  the full design record).
-- `WENTASIZE` batch over selection sets; live re-size on edit (UX).
-- `WENTAPRESSURE` — `Network`/`Solver` on traced drawing; critical-path ΔP
-  reported per source.
-- `WENTAREAD` / `WENTAWRITE` — wenta-JSON round-trip (pydantic-compatible
-  DTOs), stable IDs in XData.
+**Every engine half of this phase is in `Wenta.Core` with tests; what is
+left in each item is the ZWCAD command**, which needs the ZWCAD 2021 SDK
+on the build machine.
+
+| Item | Engine | Command |
+|---|---|---|
+| `WENTADUCT` sizing + label + XData design record | `Sizing` ✓ | ships |
+| `WENTASIZE` batch over a selection set | `BatchSizing` ✓ (5 methods, EN/ASHRAE/DIN snap, per-request errors) | #24 |
+| `WENTAPRESSURE` critical-path ΔP | `PressureReport` ✓ (per-port rows, cumulative, share) | #47 |
+| `WENTAREAD` / `WENTAWRITE` JSON round-trip | `NetworkJson` ✓ (schema_version 1, GUID + `wenta_class` + `drawing_scope`) | #20, #22 |
+| `WENTATRACE` polylines → network | `Topology.Trace` ✓ (tee detection, flatten) | #19 |
+| `WENTAFITTING` blocks → ζ | `Catalog` + `ReCorrections` ✓ | #21 |
 
 ## Phase 3 — UX: the Ventpack-class drawing experience
 
 Where Ventpack wins today; a full phase, not an afterthought:
 
 1. **Continuous routing** — single/multi-run drawing with mid-run diameter
-   + elevation changes, offset tracing from walls (XData drives it).
+   + elevation changes, offset tracing from walls (XData drives it). #56 —
+   no engine half; this is drawing UX.
 2. **Quick-connect** — auto-insert reducers/transitions/flexes/spacers on
-   join (EN transformation tables from `StandardSizes`).
-3. **Auto-network recognition** — trace polylines → `Network` (topology,
-   tee detection) so pressure results come from geometry, not menus.
-4. **Smart annotation** — branch numbering (`marking` semantics), size/
-   flow/velocity labels as parametric blocks, auto-update on edit.
+   join. Engine done: `QuickConnect.Plan` picks the chain and costs it
+   (taper rule, ζ from catalog or correlation). #57 for the command.
+3. **Auto-network recognition** — trace polylines → `Network`. Engine done:
+   `Topology.Trace`. #19 for the command.
+4. **Smart annotation** — branch numbering (`Marking` ✓), size/flow/
+   velocity labels as parametric blocks, auto-update on edit. #59.
 5. **Intelligent sections** — section view at any angle, section entities
-   excluded from BOM (Phase 5).
+   excluded from BOM (Phase 5). #58 — no engine half.
 6. Palette = modeless sizing form (live preview), ribbon = command
-   surface; both persisted.
+   surface; both persisted. #25 — the solver meets the budget with room to
+   spare (1290 components re-solve in ~1.3 ms against a 200 ms target,
+   guarded by `RunPerformance` in the suite); the threading and the form
+   are the remaining work.
 
 ## Phase 4 — Beyond-wenta engineering (C# ports of venti's feature set)
 
@@ -128,28 +136,35 @@ The modules `venti` proved out are all in C# now (library half done in
 
 ## Phase 5 — PL-market items (item 3 of the competitive review)
 
-1. **Open library feed** — the ζ-catalog JSON format (Phase 1 `Catalog`) +
-   one shipped example catalog + published format spec; vendors/users
-   contribute data without code (Wentyle's sponsored-library moat, opened).
-2. **KNR-ready BOM** — `Bom` produces KNR-formatted estimate rows,
-   per-vendor schedules, and dimensioned fabrication drawings (rect
-   fittings) as drawing tables + CSV/XLSX export.
-3. **Multi-drawing / multi-storey projects** — drawing-scope IDs in the
-   network DTOs (schema designed in Phase 2), cross-drawing connection
-   registry, storey manager palette; a network spans drawings via
-   stable-GUID links.
+1. **Open library feed** ✓ — the ζ-catalog JSON format, three example
+   catalogs and the published spec (`csharp/catalogs/FORMAT.md`), with
+   vendor merge that records every override. #53 closed; choosing the
+   active catalog from the ribbon is the remaining plugin bit.
+2. **KNR-ready BOM** — `KnrMap` ✓ makes the codes a per-edition data file
+   with unmapped kinds reported (#54 closed); `BomExport` ✓ writes JSON and
+   XLSX. Per-vendor schedules and dimensioned fabrication drawings as
+   drawing tables are still open (#29).
+3. **Multi-drawing / multi-storey projects** — `MultiDrawing` ✓ merges
+   scoped drawing documents linked by stable GUIDs into one solvable
+   network, with validation; the storey-manager palette is #55.
 
 ## Phase 6 — Distribution & quality
 
 WiX MSI (DLL + CUIX + registry + example catalog), semver, CI on a
 Windows+ZWCAD2021 runner (evidence-log assert + screenshot diff), crash
-discipline (no unhandled exception in ZWCAD, `wenta.log`), docs EN/PL,
-`WENTAHELP`.
+discipline (no unhandled exception in ZWCAD, `wenta.log`), `WENTAHELP`.
+Docs ✓: EN/PL user guide (`docs/user-guide.{en,pl}.md`), catalog spec, and
+the library CI (`.github/workflows/csharp.yml`) — #37 less `WENTAHELP`.
+The MSI (#36) needs WiX, which is not installed on the current machine.
 
 ## Phase 7 — 3D, clash, IFC (full-suite scope)
 
-Elevation → solids/fittings 3D, sections/isometrics, clash check,
-IFC export (C# toolkit — no Python side), BIM views. After M3.
+Elevation → solids/fittings 3D, sections/isometrics, BIM views (#60) —
+drawing work, no engine half. Clash check ✓ (`Clash.cs`, segment clearance
+with CSV) and IFC4 export ✓ (`IfcExport.cs` — duct segments, fittings, air
+terminals, `Pset_Wenta`, deterministic GlobalIds; not yet opened in a
+viewer) are in the library; `WENTACLASH` and the export command are the
+remaining plugin work. After M3.
 
 ---
 
