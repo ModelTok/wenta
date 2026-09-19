@@ -56,6 +56,9 @@ namespace Wenta.Core.Tests
             RunCatalogMerge(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "catalogs"));
             RunKnrMap();
             RunBomExport();
+            RunPressureReport();
+            RunBatchSizing();
+            RunIfcExport();
 
             Console.WriteLine();
             Console.WriteLine("==== " + _pass + " passed, " + _fail + " failed ====");
@@ -2018,6 +2021,164 @@ namespace Wenta.Core.Tests
             CheckTrue("bomx.xlsx_sheet_name", text.Contains("name=\"BOM\""));
             CheckTrue("bomx.xlsx_sheet_name_sanitised",
                 System.Text.Encoding.UTF8.GetString(BomExport.ToXlsx(bom, "a/b:c")).Contains("name=\"a_b_c\""));
+        }
+
+        // ---- PressureReport (issue #47) — critical-path ΔP rows over a solved network ----
+        private static void RunPressureReport()
+        {
+            Network net = TeeNetwork();
+            double dp = net.Solve();
+            PressureReport rep = PressureReport.Build(net);
+            Check("pressure.critical_dp", rep.CriticalDpPa, dp, 0.0);
+            CheckInt("pressure.row_count", rep.Rows.Count, 8);
+            CheckStr("pressure.first_component", rep.Rows[0].ComponentId, "ahu");
+            CheckStr("pressure.last_component", rep.Rows[rep.Rows.Count - 1].ComponentId, "t2");
+            CheckStr("pressure.last_kind", rep.Rows[rep.Rows.Count - 1].Kind, "Terminal");
+            Check("pressure.cumulative_reaches_total", rep.Rows[rep.Rows.Count - 1].CumulativeDpPa, dp, 1e-9);
+            double shares = 0.0, cum = 0.0;
+            bool monotonic = true;
+            foreach (PressureReportRow r in rep.Rows)
+            {
+                shares += r.SharePercent;
+                if (r.CumulativeDpPa < cum - 1e-12) monotonic = false;
+                cum = r.CumulativeDpPa;
+            }
+            Check("pressure.shares_sum_100", shares, 100.0, 1e-9);
+            CheckTrue("pressure.cumulative_monotonic", monotonic);
+            PressureReportRow flex = null;
+            foreach (PressureReportRow r in rep.Rows)
+                if (r.ComponentId == "flex" && r.Port == "inlet") flex = r;
+            CheckTrue("pressure.flex_row_present", flex != null);
+            if (flex != null)
+            {
+                Check("pressure.flex_dp", flex.DpPa, 6.0, 1e-12);
+                Check("pressure.flex_share", flex.SharePercent, 78.642135303542176, 1e-9);
+            }
+            string csv = rep.ToCsv();
+            string[] lines = csv.Split('\n');
+            CheckInt("pressure.csv_lines", lines.Length, 9);
+            CheckStr("pressure.csv_header", lines[0], "component_id,kind,port,flow_m3s,velocity_ms,dp_pa,cumulative_dp_pa,share_percent");
+            CheckStr("pressure.csv_first_row", lines[1], "ahu,Source,outlet,0.1,0,0,0,0");
+            CheckTrue("pressure.text_has_total", rep.ToText().Contains("7.63 Pa"));
+            CheckStr("pressure.deterministic", PressureReport.Build(net).ToCsv(), csv);
+
+            var noTerminal = new Network { Name = "src-only" };
+            noTerminal.Add("ahu", new Source("AHU"));
+            ExpectError(true, "pressure.err_no_terminal", () => PressureReport.Build(noTerminal));
+        }
+
+        // ---- BatchSizing (issue #24) — five methods over a request list, EN snap ----
+        private static void RunBatchSizing()
+        {
+            var reqs = new List<BatchSizingRequest>
+            {
+                new BatchSizingRequest { Id = "v", FlowrateM3s = 0.1, Method = SizingMethod.Velocity, TargetVelocity = 4.0 },
+                new BatchSizingRequest { Id = "ef", FlowrateM3s = 0.1, Method = SizingMethod.EqualFriction, TargetPaPerM = 1.0 },
+                new BatchSizingRequest { Id = "pb", FlowrateM3s = 0.1, Method = SizingMethod.PressureDropBudget, LengthM = 10.0, BudgetPa = 10.0 },
+                new BatchSizingRequest { Id = "nl", FlowrateM3s = 0.1, Method = SizingMethod.NoiseLimit, SpaceType = "office" },
+                new BatchSizingRequest { Id = "ar", FlowrateM3s = 0.1, Method = SizingMethod.AspectRatio, Shape = Sizing.ShapeRectangular, TargetVelocity = 4.0, AspectRatio = 2.0 },
+                new BatchSizingRequest { Id = "bad", FlowrateM3s = -0.1, Method = SizingMethod.Velocity },
+            };
+            List<BatchSizingResult> res = BatchSizing.Size(reqs);
+            CheckInt("batch.count", res.Count, 6);
+            foreach (BatchSizingResult r in res)
+                if (r.Id != "bad") CheckTrue("batch.ok_" + r.Id, r.Error == null && r.Result != null);
+            CheckInt("batch.velocity_snap", res[0].SnappedRoundMm ?? -1, 200);
+            Check("batch.velocity_ms", res[0].Result.Velocity, 3.1830988618379066, 1e-12);
+            CheckInt("batch.equal_friction_snap", res[1].SnappedRoundMm ?? -1, 200);
+            CheckInt("batch.budget_snap", res[2].SnappedRoundMm ?? -1, 200);
+            CheckInt("batch.noise_snap", res[3].SnappedRoundMm ?? -1, 200);
+            CheckTrue("batch.aspect_rect_snap", res[4].SnappedRectMm != null && res[4].SnappedRectMm[0] == 100 && res[4].SnappedRectMm[1] == 250);
+            CheckTrue("batch.aspect_no_round_snap", res[4].SnappedRoundMm == null);
+            CheckStr("batch.bad_error", res[5].Error, "flowrate must be positive, got -0.1");
+            CheckTrue("batch.bad_no_result", res[5].Result == null && res[5].SnappedRoundMm == null);
+            int[] rect = BatchSizing.SnapRectangular(Standard.En1505_1506, 210.0, 260.0);
+            CheckTrue("batch.snap_rect_up", rect != null && rect[0] == 250 && rect[1] == 300);
+            CheckTrue("batch.snap_rect_none", BatchSizing.SnapRectangular(Standard.En1505_1506, 5000.0, 5000.0) == null);
+            CheckInt("batch.din_round", BatchSizing.Size(new[] { reqs[0] }, Standard.Din)[0].SnappedRoundMm ?? -1, 200);
+            CheckInt("batch.ashrae_round", BatchSizing.Size(new[] { reqs[0] }, Standard.AsHrae)[0].SnappedRoundMm ?? -1, 203);
+            string csv = BatchSizing.ToCsv(res);
+            CheckTrue("batch.csv_header", csv.StartsWith("id,shape,diameter_m,"));
+            CheckInt("batch.csv_lines", csv.Split('\n').Length, 7);
+        }
+
+        // ---- IfcExport (issue #61) — IFC4 SPF from a traced system ----
+        private static TracedSystem TracedTee()
+        {
+            var opts = new TraceOptions();
+            opts.Diameters["duct1"] = 0.3;
+            opts.Flows["term0"] = 0.06;
+            opts.Flows["term1"] = 0.04;
+            return Topology.Trace(new List<Polyline>
+            {
+                Pl(0.0, 1.0, 1.0, 1.0, 2.0, 1.0),
+                Pl(2.0, 1.0, 3.0, 1.0),
+                Pl(2.0, 1.0, 2.0, 0.0),
+            }, opts);
+        }
+
+        private static int CountOf(string text, string needle)
+        {
+            int n = 0, i = 0;
+            while ((i = text.IndexOf(needle, i, StringComparison.Ordinal)) >= 0) { n++; i += needle.Length; }
+            return n;
+        }
+
+        private static void RunIfcExport()
+        {
+            string ifc = IfcExport.ToIfc(TracedTee());
+            CheckTrue("ifc.starts", ifc.StartsWith("ISO-10303-21;"));
+            CheckTrue("ifc.ends", ifc.TrimEnd().EndsWith("END-ISO-10303-21;"));
+            CheckTrue("ifc.schema", ifc.Contains("FILE_SCHEMA(('IFC4'))"));
+            CheckInt("ifc.duct_segments", CountOf(ifc, "IFCDUCTSEGMENT("), 4);
+            CheckInt("ifc.duct_fittings", CountOf(ifc, "IFCDUCTFITTING("), 1);
+            CheckInt("ifc.air_terminals", CountOf(ifc, "IFCAIRTERMINAL("), 2);
+            CheckInt("ifc.source_proxy", CountOf(ifc, "IFCBUILDINGELEMENTPROXY("), 1);
+            CheckInt("ifc.property_sets", CountOf(ifc, "IFCPROPERTYSET("), 8);
+            CheckInt("ifc.storey", CountOf(ifc, "IFCBUILDINGSTOREY("), 1);
+            CheckTrue("ifc.flow_in_pset", ifc.Contains("IFCVOLUMETRICFLOWRATEMEASURE(0.1)"));
+
+            // Every #n= id is unique and every #n reference resolves.
+            var ids = new HashSet<int>();
+            var refs = new List<int>();
+            bool dup = false;
+            foreach (string raw in ifc.Split('\n'))
+            {
+                string line = raw.Trim();
+                if (!line.StartsWith("#")) continue;
+                int eq = line.IndexOf('=');
+                if (eq < 0) continue;
+                int id = int.Parse(line.Substring(1, eq - 1), CultureInfo.InvariantCulture);
+                if (!ids.Add(id)) dup = true;
+                for (int i = eq; i < line.Length; i++)
+                {
+                    if (line[i] != '#') continue;
+                    int j = i + 1;
+                    while (j < line.Length && char.IsDigit(line[j])) j++;
+                    if (j > i + 1) refs.Add(int.Parse(line.Substring(i + 1, j - i - 1), CultureInfo.InvariantCulture));
+                }
+            }
+            CheckTrue("ifc.ids_unique", !dup);
+            bool allResolve = true;
+            foreach (int r in refs) if (!ids.Contains(r)) allResolve = false;
+            CheckTrue("ifc.refs_resolve", allResolve);
+            CheckInt("ifc.entity_count", ids.Count, 127);
+
+            // Deterministic apart from the FILE_NAME timestamp line.
+            string a = ifc, b = IfcExport.ToIfc(TracedTee());
+            string[] la = a.Split('\n'), lb = b.Split('\n');
+            bool same = la.Length == lb.Length;
+            for (int i = 0; same && i < la.Length; i++)
+                if (la[i] != lb[i] && !la[i].StartsWith("FILE_NAME")) same = false;
+            CheckTrue("ifc.deterministic", same);
+            CheckStr("ifc.guid_roundtrip", IfcExport.CompressGuid(IfcExport.ExpandGuid(IfcExport.DeterministicGlobalId("duct1"))),
+                IfcExport.DeterministicGlobalId("duct1"));
+            CheckInt("ifc.guid_len", IfcExport.DeterministicGlobalId("x").Length, 22);
+
+            string single = IfcExport.ToIfc(Topology.Trace(new List<Polyline> { Pl(0.0, 0.0, 5.0, 0.0) }, new TraceOptions()));
+            CheckInt("ifc.single_segments", CountOf(single, "IFCDUCTSEGMENT("), 1);
+            CheckInt("ifc.single_fittings", CountOf(single, "IFCDUCTFITTING("), 0);
+            CheckInt("ifc.single_terminals", CountOf(single, "IFCAIRTERMINAL("), 1);
         }
     }
 }

@@ -58,7 +58,10 @@ rem ---- Wenta.Core.dll ----
   "%ROOT%Wenta.Core\Electrical.cs" ^
   "%ROOT%Wenta.Core\NetworkJson.cs" ^
   "%ROOT%Wenta.Core\KnrMap.cs" ^
-  "%ROOT%Wenta.Core\BomExport.cs"
+  "%ROOT%Wenta.Core\BomExport.cs" ^
+  "%ROOT%Wenta.Core\PressureReport.cs" ^
+  "%ROOT%Wenta.Core\BatchSizing.cs" ^
+  "%ROOT%Wenta.Core\IfcExport.cs"
 if errorlevel 1 ( echo BUILD FAILED: Wenta.Core & exit /b 1 )
 
 rem ---- Wenta.Core.Tests.exe ----
