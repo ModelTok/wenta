@@ -19,9 +19,10 @@ of truth.**
 Wenta.Core/           pure C# library (compiles standalone, net48-compatible)
   Units.cs Fluid.cs Geometry.cs Physics.cs StandardSizes.cs Standards.cs
   FittingsLibrary.cs Elbow.cs ReCorrections.cs Components.cs Network.cs
-  Solver.cs Sizing.cs Catalog.cs Bom.cs Results.cs Analysis.cs Marking.cs
-  Balancing.cs Room.cs Sound.cs Fan.cs Insulation.cs Electrical.cs
-  Fabrication.cs Development.cs Clash.cs Topology.cs Settings.cs
+  Solver.cs Sizing.cs BatchSizing.cs Catalog.cs KnrMap.cs Bom.cs BomExport.cs
+  Results.cs Analysis.cs PressureReport.cs Marking.cs Balancing.cs Room.cs
+  Sound.cs Fan.cs Insulation.cs Electrical.cs Fabrication.cs Development.cs
+  Clash.cs Topology.cs IfcExport.cs NetworkJson.cs Settings.cs
 Wenta.Core.Tests/     console test runner (Program.cs, no xUnit needed)
   vectors/            CSV parity vectors (frozen golden fixtures, see below)
 catalogs/             open ζ-catalog format: FORMAT.md (spec) + example-generic,

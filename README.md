@@ -7,9 +7,10 @@ dependency-free .NET library (**Wenta.Core**) and a **ZWCAD 2021 plugin**
 Python/Mojo/Rust/WASM.
 
 ```
-csharp/Wenta.Core/         the library (28 modules, bare-csc, net48-compatible)
+csharp/Wenta.Core/         the library (35 modules, bare-csc, net48-compatible)
 csharp/Wenta.Core.Tests/   console test runner + frozen CSV parity vectors
-csharp/catalogs/           open ζ-catalog format (example-generic.json)
+csharp/catalogs/           open ζ-catalog format + KNR mapping (FORMAT.md, examples)
+docs/                      user guide, EN + PL
 zwcad-plugin/              WentaZwcad — ZWCAD 2021 plugin, CUIX ribbon, ROADMAP.md
 ```
 
@@ -45,10 +46,11 @@ double criticalPathPa = net.Solve();   // standard air by default
 |---|---|
 | Core physics | `Units` `Fluid` `Geometry` `Physics` (Swamee–Jain + Colebrook, losses, flex) |
 | Size tables | `StandardSizes` (EN 1505/1506) · `Standards` (selectable EN / ASHRAE / DIN) |
-| Sizing | `Sizing` — velocity / equal-friction / budget / noise / aspect-ratio, round + rect |
-| Fittings | `FittingsLibrary` (23 correlations) · `Elbow` (round-elbow spline) · `ReCorrections` (Re/size ζ corrections) · `Catalog` (open ζ-catalog + vendor merge) |
-| Network | `Components` `Network` `Solver` (flow propagation, ΔP, critical path, cycles) · `Topology` (polylines → network, flatten) |
-| Reporting | `Results` `Analysis` (per-branch report) `Marking` (branch numbering) `Bom` (KNR-ready) |
+| Sizing | `Sizing` — velocity / equal-friction / budget / noise / aspect-ratio, round + rect · `BatchSizing` (request lists, standard snapping) |
+| Fittings | `FittingsLibrary` (23 correlations) · `Elbow` (round-elbow spline) · `ReCorrections` (Re/size ζ corrections) · `Catalog` (open ζ-catalog + vendor merge, spec in `csharp/catalogs/FORMAT.md`) |
+| Network | `Components` `Network` `Solver` (flow propagation, ΔP, critical path, cycles) · `Topology` (polylines → network, flatten) · `NetworkJson` (versioned JSON round-trip) |
+| Reporting | `Results` `Analysis` (per-branch report) `PressureReport` (critical-path ΔP) `Marking` (branch numbering) `Bom` + `KnrMap` (configurable KNR codes) + `BomExport` (JSON/XLSX) |
+| Exchange | `IfcExport` (IFC4 duct segments / fittings / terminals from a traced system) |
 | Engineering | `Balancing` `Room` (ACH) `Sound` (regenerated noise, NC) `Fan` (curves, duty point, power) `Insulation` (condensation, heat loss) `Electrical` |
 | Fabrication | `Fabrication` (area, weight, cutting schedule) `Development` (flat patterns) `Clash` (segment clearance) |
 | Project | `Settings` (`ProjectSettings`, `UnitSystem`) |
