@@ -62,6 +62,7 @@ namespace Wenta.Core.Tests
             RunMultiDrawing();
             RunReFit();
             RunQuickConnect();
+            RunPerformance();
 
             Console.WriteLine();
             Console.WriteLine("==== " + _pass + " passed, " + _fail + " failed ====");
@@ -2501,6 +2502,72 @@ namespace Wenta.Core.Tests
             ExpectError(true, "qc.err_bad_angle", () =>
                 QuickConnect.Plan(new Round(0.2), new Round(0.15),
                     new QuickConnectOptions { FlowrateM3s = 0.1, MaxTaperAngleDeg = 90.0 }));
+        }
+
+        // ---- Solver performance (issue #25: a live panel needs <200 ms recalc) ----
+        // A branching supply system: trunk ducts with a tee per storey, each tee
+        // feeding a run that ends in a terminal.
+        private static Network BenchNetwork(int tees, int runLength)
+        {
+            var net = new Network { Name = "bench" };
+            net.Add("ahu", new Source("AHU"));
+            string upstream = "ahu";
+            for (int t = 0; t < tees; t++)
+            {
+                string duct = "trunk" + t;
+                net.Add(duct, new RigidDuct(duct, new Round(0.4), 3.0));
+                net.Connect(upstream, duct);
+                if (t == tees - 1)
+                {
+                    net.Add("termEnd", new Terminal("termEnd", 0.05));
+                    net.Connect(duct, "termEnd");
+                    break;
+                }
+                string tee = "tee" + t;
+                net.Add(tee, new Tee(tee, new Round(0.4), 0.1, 0.4));
+                net.Connect(duct, tee);
+                upstream = tee + ".straight";
+                string prev = null;
+                for (int i = 0; i < runLength; i++)
+                {
+                    string id = "b" + t + "_" + i;
+                    net.Add(id, new RigidDuct(id, new Round(0.2), 4.0));
+                    if (prev == null) net.Connect(tee + ".branch", id);
+                    else net.Connect(prev, id);
+                    prev = id;
+                }
+                string term = "term" + t;
+                net.Add(term, new Terminal(term, 0.05));
+                net.Connect(prev, term);
+            }
+            return net;
+        }
+
+        private static void RunPerformance()
+        {
+            Network net = BenchNetwork(100, 10);
+            CheckTrue("perf.network_size", net.Components.Count >= 1000);
+            net.Solve();                                   // warm up the topo cache and the JIT
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            const int iters = 10;
+            for (int i = 0; i < iters; i++) net.Solve();
+            sw.Stop();
+            double msPerSolve = sw.Elapsed.TotalMilliseconds / iters;
+            Console.WriteLine("  [perf] " + net.Components.Count + " components, re-solve "
+                + msPerSolve.ToString("F3", C) + " ms");
+            // The live-panel budget is 200 ms; measured ~2 ms on a dev box, so this
+            // only fires on a real regression, not on a slow CI runner.
+            CheckTrue("perf.resolve_under_200ms", msPerSolve < 200.0);
+
+            var sw2 = System.Diagnostics.Stopwatch.StartNew();
+            Network fresh = BenchNetwork(100, 10);
+            fresh.Solve();
+            sw2.Stop();
+            Console.WriteLine("  [perf] build + first solve "
+                + sw2.Elapsed.TotalMilliseconds.ToString("F3", C) + " ms");
+            CheckTrue("perf.cold_under_1s", sw2.Elapsed.TotalMilliseconds < 1000.0);
+            Check("perf.same_answer", fresh.Solve(), net.Solve(), 1e-12);
         }
     }
 }
