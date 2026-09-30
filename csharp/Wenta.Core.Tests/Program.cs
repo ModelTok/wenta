@@ -2094,7 +2094,8 @@ namespace Wenta.Core.Tests
             CheckInt("batch.noise_snap", res[3].SnappedRoundMm ?? -1, 200);
             CheckTrue("batch.aspect_rect_snap", res[4].SnappedRectMm != null && res[4].SnappedRectMm[0] == 100 && res[4].SnappedRectMm[1] == 250);
             CheckTrue("batch.aspect_no_round_snap", res[4].SnappedRoundMm == null);
-            CheckStr("batch.bad_error", res[5].Error, "flowrate must be positive, got -0.1");
+            // Sizing formats the value with the current culture (e.g. "-0,1"), so build the expectation the same way.
+            CheckStr("batch.bad_error", res[5].Error, "flowrate must be positive, got " + (-0.1));
             CheckTrue("batch.bad_no_result", res[5].Result == null && res[5].SnappedRoundMm == null);
             int[] rect = BatchSizing.SnapRectangular(Standard.En1505_1506, 210.0, 260.0);
             CheckTrue("batch.snap_rect_up", rect != null && rect[0] == 250 && rect[1] == 300);
