@@ -420,6 +420,16 @@ namespace WentaZwcad.Tools
         <LargeImage Name=""wenta_duct_32.png"" />
       </Macro>
     </MenuMacro>
+    <MenuMacro UID=""WENTA_LABEL"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_LABEL_NM"">Smart Labels</Name>
+        <Command>^C^C_.WENTALABEL</Command>
+        <HelpString xlate=""true"" UID=""WENTA_LABEL_HS"">Label every drawn duct with size, flow, velocity and pressure drop; labels follow edits: WENTALABEL</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_info_32.png"" />
+      </Macro>
+    </MenuMacro>
     <MenuMacro UID=""WENTA_HELP"">
       <Macro type=""Any"">
         <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
@@ -531,6 +541,10 @@ namespace WentaZwcad.Tools
         </RibbonCommandButton>
         <RibbonCommandButton UID=""WENTA_RBTN_FLAT"" Id=""ZwRibbonCommandButton"" Text=""Flat Patterns"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_FLAT"" KeyTip="""">
           <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_FLAT_TT"">Flat Patterns</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_LABEL"" Id=""ZwRibbonCommandButton"" Text=""Smart Labels"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_LABEL"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_LABEL_TT"">Smart Labels</TooltipTitle>
           <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
         </RibbonCommandButton>
         <RibbonCommandButton UID=""WENTA_RBTN_HELP"" Id=""ZwRibbonCommandButton"" Text=""Wenta Help"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_HELP"" KeyTip="""">

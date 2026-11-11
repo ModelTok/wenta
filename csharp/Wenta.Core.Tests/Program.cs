@@ -66,6 +66,7 @@ namespace Wenta.Core.Tests
             RunSolverVentiSemantics();
             RunNetworkEdit();
             RunSchedule();
+            RunAnnotation();
             RunPerformance();
 
             Console.WriteLine();
@@ -2452,6 +2453,90 @@ namespace Wenta.Core.Tests
         }
 
         // #23 / #27: NetworkEdit on the reference network with its layout.
+        private static void RunAnnotation()
+        {
+            Network net = ReferenceHandBuilt();
+            net.Solve();
+            LabelStyle def = LabelStyle.Default();
+            List<SmartLabel> labels = Annotation.Build(net, def);
+            CheckInt("anno.count", labels.Count, 3);
+            var marks = new Dictionary<string, uint>();
+            foreach (Mark m in Marking.AssignBranchMarks(net)) marks[m.ComponentId] = m.BranchNo;
+            uint prev = 0;
+            foreach (SmartLabel l in labels)
+            {
+                CheckTrue("anno.sorted_" + l.ComponentId, l.BranchNo > prev);
+                prev = l.BranchNo;
+                CheckInt("anno.branch_" + l.ComponentId, (int)l.BranchNo, (int)marks[l.ComponentId]);
+                CheckStr("anno.branch_text_" + l.ComponentId, l.Values["branch"], "#" + l.BranchNo.ToString(CultureInfo.InvariantCulture));
+            }
+            SmartLabel main = labels.Find(l => l.ComponentId == "main");
+            CheckInt("anno.main_branch_1", (int)main.BranchNo, 1);
+            CheckStr("anno.main_size", main.Values["size"], "Ø250");
+            CheckStr("anno.main_flow", main.Values["flow"], "0.100 m³/s");
+            double v = 0.1 / (Math.PI * 0.25 * 0.25 / 4.0);
+            CheckStr("anno.main_velocity", main.Values["velocity"], v.ToString("F2", CultureInfo.InvariantCulture) + " m/s");
+            CheckStr("anno.main_dpm", main.Values["dpm"],
+                (net.Components["main"].TotalPressureDrop() / 5.0).ToString("F2", CultureInfo.InvariantCulture) + " Pa/m");
+            CheckStr("anno.text_default", main.Text(def), "main  #1  Ø250  0.100 m³/s  " + main.Values["velocity"] + "  " + main.Values["dpm"]);
+
+            LabelStyle two = LabelStyle.Parse("{\"schema_version\":1,\"fields\":[\"size\",\"flow\"],\"flow_decimals\":2,\"text_height_mm\":150}", "inline");
+            CheckStr("anno.text_two_fields", Annotation.Build(net, two).Find(l => l.ComponentId == "main").Text(two), "Ø250  0.10 m³/s");
+            Check("anno.style_height", two.TextHeightMm, 150.0, 1e-12);
+            CheckTrue("anno.style_shows", two.Shows("size") && !two.Shows("velocity"));
+            LabelStyle back = LabelStyle.Parse(two.ToJson(), "round-trip");
+            CheckStr("anno.style_roundtrip_fields", string.Join(",", back.Fields), "size,flow");
+            CheckInt("anno.style_roundtrip_dec", back.FlowDecimals, 2);
+            Check("anno.style_roundtrip_offset", back.OffsetMm, def.OffsetMm, 1e-12);
+            ExpectError(true, "anno.err_field", () => LabelStyle.Parse("{\"fields\":[\"colour\"]}", "inline"));
+            ExpectError(true, "anno.err_empty_fields", () => LabelStyle.Parse("{\"fields\":[]}", "inline"));
+            ExpectError(true, "anno.err_schema", () => LabelStyle.Parse("{\"schema_version\":2}", "inline"));
+            ExpectError(true, "anno.err_height", () => LabelStyle.Parse("{\"text_height_mm\":0}", "inline"));
+            ExpectError(true, "anno.err_decimals", () => LabelStyle.Parse("{\"dpm_decimals\":1.5}", "inline"));
+            ExpectError(true, "anno.err_json", () => LabelStyle.Parse("not json", "inline"));
+            ExpectError(true, "anno.err_null", () => Annotation.Build(null, def));
+
+            // Numbering is by topology, not by insertion (draw) order.
+            var rev = new Network { Name = "rev" };
+            rev.Add("t2", new Terminal("t2", 0.04, null, 0.0));
+            rev.Add("t1", new Terminal("t1", 0.06, null, 0.0));
+            rev.Add("branch", new RigidDuct("branch", new Round(0.16), 3.0));
+            rev.Add("straight", new RigidDuct("straight", new Round(0.2), 3.0));
+            rev.Add("tee", new Tee("tee", new Round(0.25), 0.0, 0.5));
+            rev.Add("main", new RigidDuct("main", new Round(0.25), 5.0));
+            rev.Add("src", new Source("AHU"));
+            rev.Connect("src", "main.inlet");
+            rev.Connect("main.outlet", "tee.combined");
+            rev.Connect("tee.straight", "straight.inlet");
+            rev.Connect("tee.branch", "branch.inlet");
+            rev.Connect("straight.outlet", "t1");
+            rev.Connect("branch.outlet", "t2");
+            rev.Solve();
+            foreach (SmartLabel l in Annotation.Build(rev, def))
+                CheckInt("anno.stable_" + l.ComponentId, (int)l.BranchNo, (int)marks[l.ComponentId]);
+
+            // After an edit the labels carry the new values (what the plugin
+            // writes into the blocks), and nothing else changes.
+            EditResult d = NetworkEdit.Set(net, new Dictionary<string, ComponentMeta>(), "branch", "diameter", 200.0);
+            d.Network.Solve();
+            List<SmartLabel> after = Annotation.Build(d.Network, def);
+            CheckStr("anno.edit_size", after.Find(l => l.ComponentId == "branch").Values["size"], "Ø200");
+            CheckStr("anno.edit_other_same", after.Find(l => l.ComponentId == "main").Values["size"], "Ø250");
+            CheckInt("anno.edit_numbering_same", (int)after.Find(l => l.ComponentId == "branch").BranchNo, (int)marks["branch"]);
+
+            var fx = new Network { Name = "fx" };
+            fx.Add("src", new Source("AHU"));
+            fx.Add("f", new FlexDuct("f", 0.16, 2.0, 1.5));
+            fx.Add("t", new Terminal("t", 0.05, null, 0.0));
+            fx.Connect("src", "f.inlet");
+            fx.Connect("f.outlet", "t");
+            fx.Solve();
+            SmartLabel fl = Annotation.Build(fx, def)[0];
+            CheckStr("anno.flex_size", fl.Values["size"], "flex Ø160");
+            CheckStr("anno.flex_branch", fl.Values["branch"], "");
+            CheckStr("anno.flex_text_skips_empty", fl.Text(def).Substring(0, 13), "f  flex Ø160 ");
+        }
+
         private static void RunSchedule()
         {
             Network net = ReferenceHandBuilt();

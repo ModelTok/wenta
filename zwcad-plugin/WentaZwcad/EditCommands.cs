@@ -71,6 +71,8 @@ namespace WentaZwcad
             foreach (string w in warnings) doc.Editor.WriteMessage("\nWarning: " + w);
             int created, updated, stale;
             RoundTripCommands.Draw(doc, items, out created, out updated, out stale);
+            // #59: smart labels follow every edit.
+            LabelCommands.RefreshIfPresent(doc, "edit");
             return updated;
         }
 
