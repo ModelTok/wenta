@@ -105,7 +105,7 @@ remain in the ZWCAD profile until it is unloaded with `MENULOAD`/`CUI`.
 
 ## 3. Commands reference
 
-Five commands exist. Every command appends one line to the evidence log
+Ten commands exist. Every command appends one line to the evidence log
 `%TEMP%\wenta_zwcad_test.txt` (e.g. `WENTADUCT ok  200×200 mm  0,150 m3/s
 3,75 m/s  0,9530 Pa/m`). Sizing and pressure-drop maths is done by
 `Wenta.Core`; no formula lives in the plugin.
@@ -130,9 +130,13 @@ origin:
   straight-duct friction drop for that section (Swamee–Jain friction factor,
   absolute roughness 0.1 mm, standard air).
 
-The outline receives XData under application name `WENTA`: the string
-`duct`, the flow, the velocity, a shape code (`1` round, `0` rectangular)
-and the size label. The command line echoes
+The outline receives a `WENTA` tag (XData, application name `WENTA`): the
+class `duct`, the schema marker `v2`, a GUID, then key/value string pairs
+(`geometry` = `section`, `shape`, `d_mm` or `w_mm`/`h_mm`, `flow_m3s`,
+`velocity_ms`), all written with the invariant culture. The network commands
+(§3.6–3.11) use the same layout. The record of earlier versions (`duct`,
+flow, velocity, shape code, size label) is still read. The command line
+echoes
 `Sized: 200×200 mm · 0.150 m³/s · v=3.75 m/s (target 4.0) · 0.95 Pa/m`
 (values from the verified headless run with `Rectangular`, `0.15`, `4.0`).
 
@@ -192,9 +196,110 @@ the ribbon button.
 Prints `Wenta duct plugin (wenta C# core, MIT). ZWCAD version: <version>` and
 logs the ZWCAD version (verified: `21.10.21.0`).
 
-### 3.6 Ribbon tab "Wenta"
+### 3.6 Drawing a network for the network commands
 
-One panel with five large buttons, each running one command:
+`WENTATRACE`, `WENTAPRESSURE`, `WENTASIZE` and `WENTABALANCE` read the
+network from the drawing. Draw it as follows (units: millimetres):
+
+- **Centrelines** — one `LINE`, open `LWPOLYLINE` or `ARC` per duct run.
+  Runs meet at shared end points (snap tolerance 1 mm). A point where three
+  runs meet becomes a tee; four or more runs at one point, and closed loops,
+  are rejected. Arcs and polyline bulges are followed as chords of at most
+  5°. Closed polylines (such as the `WENTADUCT` outline) are ignored.
+- **Markers** — place them with `WENTATAG` (§3.7): one *source* at the
+  air-handling-unit end, one *terminal* with its design flow at every other
+  open end, and optionally *dampers* on branch runs. A terminal marker must
+  lie within 150 mm of an open end; an open end without a terminal flow stops
+  the command and lists the positions to tag.
+- **Sizes** — a run takes its section from the `WENTA` tag written by
+  `WENTASIZE` (or an older `WENTADUCT` record); untagged runs are Ø200.
+
+At every tee the leg that continues the incoming run's direction is the
+straight leg (ζ = 0) and the other is the branch (ζ = 0.5), so the order and
+direction in which the lines were drawn does not matter. Select the whole
+network, markers included, when a command asks for objects (`ALL` works:
+labels and overlays are skipped).
+
+### 3.7 `WENTATAG` — place a terminal, source or damper marker
+
+Prompts: `Marker [Terminal/Source/Damper] <Terminal>`, the position, and for
+a terminal `Terminal design flow [m³/s] <0.1>`. It draws a Ø200 circle on
+layer `WENTA-TAG` with a text label (`T 0.060 m³/s`, `SRC` or `DMP`) and
+stores a `WENTA` tag on it. Tagging again within 150 mm of an existing
+marker edits that marker (class, flow, position) instead of adding a second
+one, and clears its old balancing result.
+
+### 3.8 `WENTATRACE` — build the network from the drawing
+
+Builds the `Wenta.Network` from the selection (`DrawingTrace.Build` over
+`Topology.Trace`), solves it with standard air and prints the number of
+runs, tees and terminals, the total duct length, the flow at the source, the
+critical-path Δp and one line per run (`duct0  5.00 m  Ø200  0.100 m³/s`).
+The network is saved to **`%TEMP%\wenta_trace.json`** (Network JSON, §5.3);
+components that came from tagged entities carry the entity's GUID.
+
+### 3.9 `WENTAPRESSURE` — critical-path pressure drop
+
+Prompts for the site altitude (`<0>` m; above 0 the air density comes from
+`Fluid.AirAtAltitude`). It prints the `PressureReport` table of the
+critical path and a per-component table of flow, velocity and Δp
+(`Analysis.Analyze`), writes the report CSV to **`%TEMP%\wenta_pressure.csv`**
+and redraws the critical runs as a 40 mm wide polyline overlay on layer
+`WENTA-CRIT` (cleared and redrawn on every run). The critical Δp is stored in
+the drawing, so the next run also reports the change since the previous one,
+for example `previous run 4.43 Pa, change +3.57 Pa`.
+
+### 3.10 `WENTASIZE` — size every run of the network
+
+Prompts for the method and its target:
+
+| Method | Prompt (default) | Library call |
+|---|---|---|
+| `Velocity` | target velocity (4.0 m/s) | `Sizing.VelocityMethod` |
+| `EqualFriction` | target friction (1.0 Pa/m) | `Sizing.EqualFrictionMethod` |
+| `Budget` | pressure budget per run (10 Pa) | `Sizing.PressureDropBudget` |
+| `Noise` | space type (`office`) | `Sizing.NoiseLimitMethod` |
+| `Aspect` | target velocity (4.0 m/s), aspect ratio (2.0) | `Sizing.AspectRatioMethod` (rectangular) |
+
+and the shape (`Round` default, or `Rectangular`). The solver propagates the
+terminal flows to every run, `BatchSizing.Size` sizes each run and snaps it
+to the EN 1506 / EN 1505 series. Each centreline gets the size, flow and
+velocity in its `WENTA` tag and a label on layer `WENTA-LABEL`, for example
+`Ø200  0.100 m³/s  3.18 m/s`. Running it again updates the same labels in
+place (the label's handle is kept in the tag) instead of adding new ones.
+It ends with the critical-path Δp of the resized network.
+
+### 3.11 `WENTABALANCE` — damper settings per terminal
+
+Prompts for the site altitude, solves the network and calls `ReFit.Hints`:
+for every terminal, the pressure surplus over the critical path, the damper
+ζ that absorbs it and the butterfly-damper opening (`Balancing`, §4.9). The
+values are written into the terminal markers and into every damper marker on
+a run that feeds a terminal directly, and shown in their labels
+(`T 0.060 m³/s  ζ=0.15 93% open`). A branch whose damper would have to close
+completely is flagged `CHANGE HARDWARE` (smaller duct, orifice or another
+damper type). The schedule is written to **`%TEMP%\wenta_balance.csv`**:
+
+```
+marker,class,terminal_id,run_id,available_dp_pa,required_dp_pa,surplus_dp_pa,damper_zeta,damper_open_percent,needs_hardware
+```
+
+### 3.12 Checking the network commands headless
+
+`zwcad-plugin/network_test.scr` draws the reference layout (5 m main from
+(0,0) to a tee at (5000,0); 3 m straight run to a 0.06 m³/s terminal; 3 m
+branch to a 0.04 m³/s terminal; a damper on the branch) and runs every
+network command on it. Load the plugin first (installed, or `NETLOAD` in a
+wrapper script with `FILEDIA 0`). Verified on ZWCAD 2021: `WENTATRACE`
+4.43 Pa with the default Ø200; after `WENTASIZE` velocity 4 m/s (Ø200 main,
+Ø150 straight, Ø125 branch) 8.00 Pa, and a second `WENTASIZE` updated the
+three labels without adding any; `WENTABALANCE` ζ 0.15 / 93 % open for the
+straight-run terminal, while the branch is the critical path and its damper
+stays fully open. These are the values `Wenta.Core` computes for the layout.
+
+### 3.13 Ribbon tab "Wenta"
+
+One panel with ten large buttons, each running one command:
 
 | Button | Command |
 |---|---|
@@ -203,12 +308,16 @@ One panel with five large buttons, each running one command:
 | Plugin Info | `WENTAHELLO` |
 | Fitting Catalog | `WENTACATALOG` |
 | BOM + KNR | `WENTABOM` |
+| Tag Marker | `WENTATAG` |
+| Trace Network | `WENTATRACE` |
+| Pressure Drop | `WENTAPRESSURE` |
+| Size Network | `WENTASIZE` |
+| Balance Dampers | `WENTABALANCE` |
 
-### 3.7 Roadmap
+### 3.14 Roadmap
 
-Commands such as `WENTATRACE`, `WENTASIZE`, `WENTAPRESSURE`, `WENTASOUND`,
-`WENTABALANCE`, `WENTAFAN`, `WENTAINSULATE` and `WENTAHELP` are planned, not
-implemented; the library half of several of them already exists (see §4).
+Commands such as `WENTASOUND`, `WENTAFAN`, `WENTAINSULATE`, `WENTAFITTING`,
+`WENTAREAD`/`WENTAWRITE` and `WENTAHELP` are planned, not implemented; the library half of several of them already exists (see §4).
 The plan is in `zwcad-plugin/ROADMAP.md` and the GitHub issues of
 `ModelTok/wenta`.
 
@@ -396,7 +505,12 @@ vertices and `Terminal` at the other ends (`term0`, …). Diameters and terminal
 flows come from `TraceOptions.Diameters`/`Flows` (default diameter 0.2 m).
 Degree ≥ 4 vertices and loops are rejected. `TracedSystem.Flatten()` returns
 `DuctSegment`s for drawing; `TotalLengthM()` sums chain lengths. Tee legs
-are assigned by traversal order, not geometry.
+are assigned by traversal order, not geometry, unless
+`TraceOptions.StraightByDirection` is set: then the straight leg is the
+downstream run that best continues the incoming run's direction (the
+network commands set it, §3.6). `TraceOptions.SourceAt` picks the open end
+nearest a point as the source, and `TraceOptions.Sections` overrides a
+run's section.
 
 ### 4.17 Clash detection (`ClashDetection`)
 
@@ -539,13 +653,18 @@ Facts about the ZWCAD 2021 platform recorded in `zwcad-plugin/README.md`:
   `example-generic.json` next to the DLL; `install.ps1` copies it to
   `C:\ProgramData\WentaZwcad`.
 - **What did the plugin actually do?** Every command logs to
-  `%TEMP%\wenta_zwcad_test.txt`; `WENTABOM` writes `%TEMP%\wenta_bom.csv`.
+  `%TEMP%\wenta_zwcad_test.txt`; `WENTABOM` writes `%TEMP%\wenta_bom.csv`,
+  `WENTATRACE` `wenta_trace.json`, `WENTAPRESSURE` `wenta_pressure.csv` and
+  `WENTABALANCE` `wenta_balance.csv`, all in `%TEMP%`.
+- **`open duct end(s) without a terminal flow`.** Every open end except the
+  source needs a `WENTATAG` terminal marker within 150 mm; the message lists
+  the positions.
 - **Exceptions.** `ZwSoft.ZwCAD.Runtime.Exception` shadows `System.Exception`
   in plugin code; library errors are `Wenta.WentaException` with a message
   naming the offending field, file or component.
 - **Known limitation.** `WENTABOM` solves a built-in reference network
-  rather than the drawing; reading the network from the drawing is roadmap
-  work (`WENTATRACE` / `WENTAREAD`).
+  rather than the drawing; the drawn network is read by `WENTATRACE` and the
+  other network commands (§3.6).
 
 Report issues at <https://github.com/ModelTok/wenta/issues>. Include the
 ZWCAD version printed by `WENTAHELLO`, the relevant lines of

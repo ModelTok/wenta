@@ -75,6 +75,12 @@ Two kinds of assertions, both in `Wenta.Core.Tests/Program.cs`:
 - **`Topology.cs`** — trace 2D polylines into a `Network` (tee detection at
   shared vertices) and flatten a network back to draw segments; the
   library half of the WENTATRACE command.
+- **`DrawingModel.cs`** — host-agnostic adapter for the ZWCAD network
+  commands: the `WENTA` XData tag (`WentaTag`, v2 with class + GUID, legacy
+  records still read), drawn centrelines and markers in millimetres →
+  `DrawingTrace` (network plus entity ↔ component maps), per-run sizing
+  (`DrawingSizing`), damper settings (`DrawingBalancing`) and room sound
+  (`DrawingSound`). No new math; it maps data onto the modules above.
 
 The ZWCAD plugin (`../zwcad-plugin`) compiles every file in `Wenta.Core/`
 into its own DLL — keep `zwcad-plugin/build.cmd`'s file list in sync with

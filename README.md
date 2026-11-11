@@ -60,7 +60,8 @@ double criticalPathPa = net.Solve();   // standard air by default
 
 See `csharp/README.md` for the test methodology and `zwcad-plugin/README.md`
 for the plugin commands (`WENTADUCT`, `WENTACATALOG`, `WENTABOM`,
-`WENTAPANEL`, `WENTAHELLO`) and ZWCAD platform notes.
+`WENTAPANEL`, `WENTAHELLO`, `WENTATAG`, `WENTATRACE`, `WENTAPRESSURE`,
+`WENTASIZE`, `WENTABALANCE`) and ZWCAD platform notes.
 
 ## Roadmap
 

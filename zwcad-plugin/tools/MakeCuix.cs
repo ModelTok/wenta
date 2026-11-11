@@ -250,6 +250,56 @@ namespace WentaZwcad.Tools
         <LargeImage Name=""wenta_panel_32.png"" />
       </Macro>
     </MenuMacro>
+    <MenuMacro UID=""WENTA_TAG"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_TAG_NM"">Tag Marker</Name>
+        <Command>^C^C_.WENTATAG</Command>
+        <HelpString xlate=""true"" UID=""WENTA_TAG_HS"">Place or edit a terminal, source or damper marker: WENTATAG</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_info_32.png"" />
+      </Macro>
+    </MenuMacro>
+    <MenuMacro UID=""WENTA_TRACE"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_TRACE_NM"">Trace Network</Name>
+        <Command>^C^C_.WENTATRACE</Command>
+        <HelpString xlate=""true"" UID=""WENTA_TRACE_HS"">Build the duct network from the selected centrelines and markers: WENTATRACE</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_duct_32.png"" />
+      </Macro>
+    </MenuMacro>
+    <MenuMacro UID=""WENTA_PRESSURE"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_PRESSURE_NM"">Pressure Drop</Name>
+        <Command>^C^C_.WENTAPRESSURE</Command>
+        <HelpString xlate=""true"" UID=""WENTA_PRESSURE_HS"">Critical-path pressure drop report with the WENTA-CRIT overlay: WENTAPRESSURE</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_panel_32.png"" />
+      </Macro>
+    </MenuMacro>
+    <MenuMacro UID=""WENTA_SIZE"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_SIZE_NM"">Size Network</Name>
+        <Command>^C^C_.WENTASIZE</Command>
+        <HelpString xlate=""true"" UID=""WENTA_SIZE_HS"">Size every traced run and update the labels in place: WENTASIZE</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_duct_32.png"" />
+      </Macro>
+    </MenuMacro>
+    <MenuMacro UID=""WENTA_BALANCE"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_BALANCE_NM"">Balance Dampers</Name>
+        <Command>^C^C_.WENTABALANCE</Command>
+        <HelpString xlate=""true"" UID=""WENTA_BALANCE_HS"">Damper zeta and opening per terminal, written to the markers: WENTABALANCE</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_panel_32.png"" />
+      </Macro>
+    </MenuMacro>
   </MacroGroup>
 </MenuGroup>";
 
@@ -283,6 +333,26 @@ namespace WentaZwcad.Tools
         </RibbonCommandButton>
         <RibbonCommandButton UID=""WENTA_RBTN_BOM"" Id=""ZwRibbonCommandButton"" Text=""BOM + KNR"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_BOM"" KeyTip="""">
           <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_BOM_TT"">BOM + KNR</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_TAG"" Id=""ZwRibbonCommandButton"" Text=""Tag Marker"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_TAG"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_TAG_TT"">Tag Marker</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_TRACE"" Id=""ZwRibbonCommandButton"" Text=""Trace Network"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_TRACE"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_TRACE_TT"">Trace Network</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_PRESSURE"" Id=""ZwRibbonCommandButton"" Text=""Pressure Drop"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_PRESSURE"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_PRESSURE_TT"">Pressure Drop</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_SIZE"" Id=""ZwRibbonCommandButton"" Text=""Size Network"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_SIZE"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_SIZE_TT"">Size Network</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_BALANCE"" Id=""ZwRibbonCommandButton"" Text=""Balance Dampers"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_BALANCE"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_BALANCE_TT"">Balance Dampers</TooltipTitle>
           <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
         </RibbonCommandButton>
       </RibbonRow>

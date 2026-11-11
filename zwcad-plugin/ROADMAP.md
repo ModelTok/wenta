@@ -85,10 +85,11 @@ on the build machine.
 | Item | Engine | Command |
 |---|---|---|
 | `WENTADUCT` sizing + label + XData design record | `Sizing` ✓ | ships |
-| `WENTASIZE` batch over a selection set | `BatchSizing` ✓ (5 methods, EN/ASHRAE/DIN snap, per-request errors) | #24 |
-| `WENTAPRESSURE` critical-path ΔP | `PressureReport` ✓ (per-port rows, cumulative, share) | #47 |
+| `WENTASIZE` batch over a selection set | `BatchSizing` ✓ (5 methods, EN/ASHRAE/DIN snap, per-request errors) | ships (#24) |
+| `WENTAPRESSURE` critical-path ΔP | `PressureReport` ✓ (per-port rows, cumulative, share) | ships (#47) |
 | `WENTAREAD` / `WENTAWRITE` JSON round-trip | `NetworkJson` ✓ (schema_version 1, GUID + `wenta_class` + `drawing_scope`) | #20, #22 |
-| `WENTATRACE` polylines → network | `Topology.Trace` ✓ (tee detection, flatten) | #19 |
+| `WENTATRACE` polylines → network | `Topology.Trace` + `DrawingTrace` ✓ (tee detection, markers, flatten) | ships (#19) |
+| `WENTATAG` terminal/source/damper markers | `WentaTag` ✓ (v2 XData: class, GUID, key/value) | ships (#22 in part) |
 | `WENTAFITTING` blocks → ζ | `Catalog` + `ReCorrections` ✓ | #21 |
 
 ## Phase 3 — UX: the Ventpack-class drawing experience
@@ -102,7 +103,7 @@ Where Ventpack wins today; a full phase, not an afterthought:
    join. Engine done: `QuickConnect.Plan` picks the chain and costs it
    (taper rule, ζ from catalog or correlation). #57 for the command.
 3. **Auto-network recognition** — trace polylines → `Network`. Engine done:
-   `Topology.Trace`. #19 for the command.
+   `Topology.Trace`. Ships as `WENTATRACE` (#19).
 4. **Smart annotation** — branch numbering (`Marking` ✓), size/flow/
    velocity labels as parametric blocks, auto-update on edit. #59.
 5. **Intelligent sections** — section view at any angle, section entities
@@ -117,11 +118,11 @@ Where Ventpack wins today; a full phase, not an afterthought:
 
 The modules `venti` proved out are all in C# now (library half done in
 #64); what remains per module is the plugin command
-(`WENTASOUND`, `WENTABALANCE`, `WENTAFAN`, `WENTAINSULATE`, …).
+(`WENTASOUND`, `WENTAFAN`, `WENTAINSULATE`, …; `WENTABALANCE` ships).
 
 | former venti module | C# file | Library | Plugin command |
 |---|---|---|---|
-| `balancing` (damper ζ/open-%, branch surplus-Δ) | `Balancing.cs` | ✓ | #49 |
+| `balancing` (damper ζ/open-%, branch surplus-Δ) | `Balancing.cs` | ✓ | `WENTABALANCE` ships (#49) |
 | `room` (balance/ACH, RoomBalanceSet + CSV) | `Room.cs` | ✓ | #26 |
 | `sound` (regenerated noise, room equation, NC) | `Sound.cs` | ✓ | #48 |
 | `fan` (curves, duty point, power) | `Fan.cs` | ✓ | #50 |
