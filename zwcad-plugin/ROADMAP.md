@@ -90,6 +90,7 @@ on the build machine.
 | `WENTAREAD` / `WENTAWRITE` JSON round-trip | `NetworkJson` + `NetworkDrawing` ✓ (design shape, layout, orphaned-tag refusal) | ships (#20, #22) |
 | `WENTATRACE` polylines → network | `Topology.Trace` + `DrawingTrace` ✓ (tee detection, markers, flatten) | ships (#19) |
 | `WENTATAG` terminal/source/damper markers | `WentaTag` ✓ (v2 XData: class, GUID, key/value) | ships (#22 in part) |
+| `WENTAPROPS` / `WENTAMOVE` / `WENTASTRETCH` editing, XData kept | `NetworkEdit` ✓ (EN snap, stretch, move, re-solve) | ships (#23) |
 | `WENTAFITTING` blocks → ζ | `Catalog` + `ReCorrections` ✓ | #21 |
 
 ## Phase 3 — UX: the Ventpack-class drawing experience
@@ -123,7 +124,7 @@ The modules `venti` proved out are all in C# now (library half done in
 
 | former venti module | C# file | Library | Plugin command |
 |---|---|---|---|
-| `balancing` (damper ζ/open-%, branch surplus-Δ) | `Balancing.cs` | ✓ | `WENTABALANCE` ships (#49) |
+| `balancing` (damper ζ/open-%, branch surplus-Δ) | `Balancing.cs` | ✓ | `WENTABALANCE` ships (#49); `WENTAREFIT` re-sizes and re-balances after a flow change (#27) |
 | `room` (balance/ACH, RoomBalanceSet + CSV) | `Room.cs` | ✓ | #26 |
 | `sound` (regenerated noise, room equation, NC) | `Sound.cs` | ✓ | `WENTASOUND` ships; `WENTAATTEN` ships with single-number insertion loss and a fictional catalog — octave bands, breakout and propagation open (#48) |
 | `fan` (curves, duty point, power) | `Fan.cs` + `FanCatalog.cs` | ✓ | `WENTAFAN` ships (#50) |

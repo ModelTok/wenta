@@ -69,6 +69,7 @@ rem ---- Wenta.Core.dll ----
   "%ROOT%Wenta.Core\FanCatalog.cs" ^
   "%ROOT%Wenta.Core\NetworkDrawing.cs" ^
   "%ROOT%Wenta.Core\Attenuators.cs" ^
+  "%ROOT%Wenta.Core\NetworkEdit.cs" ^
   "%ROOT%Wenta.Core\Markdown.cs"
 if errorlevel 1 ( echo BUILD FAILED: Wenta.Core & exit /b 1 )
 
@@ -84,6 +85,7 @@ if errorlevel 1 ( echo BUILD FAILED: tests & exit /b 1 )
 
 xcopy /y /e /i "%ROOT%Wenta.Core.Tests\vectors" "%OUT%\vectors" >nul
 xcopy /y /i "%ROOT%catalogs\*.json" "%OUT%\catalogs" >nul
+xcopy /y /i "%ROOT%examples\*.json" "%OUT%\examples" >nul
 xcopy /y /i "%ROOT%..\docs\user-guide.*.md" "%OUT%\docs" >nul
 
 echo BUILD OK

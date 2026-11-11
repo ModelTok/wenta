@@ -90,6 +90,12 @@ Two kinds of assertions, both in `Wenta.Core.Tests/Program.cs`:
   `WENTAREAD`: lays a network out to scale (or reuses its stored layout),
   builds each entity's tag record, and reads tagged entities back into a
   network, refusing orphaned tags, copied GUIDs and inconsistent records.
+- **`NetworkEdit.cs`** — editing a drawn network for `WENTAPROPS`,
+  `WENTAMOVE`, `WENTASTRETCH` and `WENTAREFIT`: one property (diameter
+  snapped to EN 1506, width, height, length, flow, ζ), stretch a duct and
+  move what is downstream, move a point component with its ducts' ends,
+  and `ReFlow` (new terminal flow → `ReFit.Apply` → damper ζ per terminal
+  via `Balancing.BalancingZeta`), each returning the new network and layout.
 - **`Attenuators.cs`** — the attenuator catalog JSON (`AttenuatorCatalog`,
   example `catalogs/example-attenuators.json`, fictional) and
   `AttenuatorSelection` for `WENTAATTEN`: room sound per terminal net of

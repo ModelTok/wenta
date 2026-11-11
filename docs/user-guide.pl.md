@@ -332,6 +332,19 @@ Na końcu `WENTAATTEN` (studio, 50 m², α 0,2, przykładowy katalog) wstawia
 `ExampleAtten EA-200-1200` i `EA-200-600` przed dwoma terminalami, żadne
 pomieszczenie nie przekracza limitu, a ΔP rośnie z 5,14 do 6,84 Pa;
 `WENTAREAD` odczytuje potem 9 elementów i 6,84 Pa.
+Na tym samym rysunku działają potem polecenia edycji: `WENTAPROPS`
+`duct1` średnica 270 zostaje zaokrąglona w górę do Ø300 (6,84 → 6,12 Pa),
+`WENTASTRETCH` `duct1` do 4 m przesuwa tłumik i terminal na jego końcu
+(6,16 Pa), `WENTAMOVE` `tee0` o (0, −500) wydłuża trzy dołączone
+przewody (6,17 Pa), a `WENTAPROPS` `term0` przepływ 0,05 m³/s daje
+7,22 Pa; `WENTAREAD` odczytuje następnie 9 elementów bez zmian długości,
+7,22 Pa, z niezmienionymi GUID. Na końcu rysunek jest czyszczony,
+`example-dampers-network.json` zostaje narysowany w (0,−40000), a
+`WENTAREFIT` `t1` 0,12 m³/s (prędkość 4 m/s) zmniejsza odgałęzienie do
+Ø125, ustawia przepustnicę przelotu `dS` na ζ 0,14 przy otwartej
+przepustnicy odgałęzienia `dB` i zmienia ΔP z 2,59 na 6,98 Pa bez
+pozostałego niezrównoważenia w około 6 ms; `WENTAREAD` odczytuje 6,98 Pa
+bez zmian.
 
 ### 3.13 `WENTAFAN` — wentylator w punkcie pracy
 
@@ -453,9 +466,65 @@ oktawowych, promieniowania przez ścianki ani propagacji wzdłuż przewodów,
 więc wynik jest pierwszym sprawdzeniem. Urządzenia
 w `example-attenuators.json` są fikcyjne.
 
-### 3.19 Karta wstęgi „Wenta”
+### 3.19 `WENTAPROPS` / `WENTAMOVE` / `WENTASTRETCH` — edycja narysowanej sieci
 
-Jeden panel z siedemnastoma dużymi przyciskami, każdy uruchamia jedno polecenie:
+Te trzy polecenia działają na sieci narysowanej przez `WENTAWRITE`
+(§3.17). Każde odczytuje wszystkie rekordy elementów z obszaru modelu
+tak jak `WENTAREAD` i odmawia, podając pierwszy problem, gdy rysunek nie
+przechodzi walidacji. Każde pyta o identyfikator elementu (Enter, a
+potem wskazanie obiektu, bierze identyfikator z jego znacznika),
+wykonuje edycję w `Wenta.NetworkEdit`, oblicza sieć przed i po zmianie
+i rysuje rekordy ponownie **w miejscu**: te same obiekty, GUID i XData,
+z nowymi długościami, wymiarami i opisami, więc tożsamość każdego
+elementu przetrwa edycję, a kolejne `WENTAREAD` nie znajduje zmian
+długości. Komunikat podaje zmienione elementy i ΔP ścieżki krytycznej
+przed i po zmianie.
+
+- **`WENTAPROPS`** wyświetla właściwości elementu (średnicę albo
+  szerokość i wysokość w mm, długość w m, przepływ w m³/s, ζ) oraz
+  przepływ, który przez niego płynie, a następnie zmienia jedną z nich.
+  Średnica jest zaokrąglana w górę do najbliższego wymiaru wg EN 1506
+  (`StandardSizes.NearestRoundSize`, komunikat to zaznacza); szerokość i
+  wysokość są przyjmowane bez zmian; przepływ ustawia się na terminalu i
+  przenosi w górę sieci; długość oznacza rozciągnięcie (poniżej).
+  Właściwość, której element nie ma (długość terminala, przepływ
+  przewodu), oraz ujemne ζ są odrzucane.
+- **`WENTASTRETCH`** nadaje przewodowi nową długość: ostatni wierzchołek
+  przesuwa się wzdłuż ostatniego odcinka, a wszystkie elementy za nim
+  przesuwają się o ten sam wektor, więc rysunek pozostaje połączony.
+  Skrócenie, które usunęłoby ostatni odcinek, jest odrzucane.
+- **`WENTAMOVE`** przesuwa element punktowy (trójnik, kształtkę,
+  przepustnicę, tłumik, terminal, źródło) o przemieszczenie w mm. Końce
+  dołączonych przewodów podążają za nim, a przewody te przyjmują nową
+  narysowaną długość. Samych przewodów się nie przesuwa; należy je
+  rozciągnąć albo przesunąć elementy na ich końcach.
+
+### 3.20 `WENTAREFIT` — nowy przepływ terminala, dobór i równoważenie
+
+Zapytania: terminal, jego nowy przepływ (m³/s) oraz metoda doboru
+`[Velocity/EqualFriction]` z wartością docelową. W jednym poleceniu
+ustawia przepływ, otwiera wszystkie przepustnice (kształtki
+dwuportowe, których rekord ma rolę `damper`), dobiera każdy przewód do
+jego nowego przepływu metodami `WENTASIZE` (`ReFit.Apply`), nadaje
+kształtce w linii, która miała przekrój przewodu ją zasilającego, nowy
+przekrój tego przewodu, oblicza sieć i ustawia przepustnicę na gałęzi
+zasilającej każdy terminal na ζ, które wyrównuje ścieżkę terminala do
+ścieżki krytycznej (`Balancing.BalancingZeta` przy prędkości w samej
+przepustnicy; przepustnica na ścieżce krytycznej pozostaje otwarta).
+Rekordy są rysowane ponownie w miejscu, więc nowe ζ trafia do znacznika
+każdej przepustnicy. Wypisuje przewody o zmienionym wymiarze (stara i
+nowa średnica oraz prędkość), ζ i otwarcie każdej przepustnicy oraz
+terminale z nadwyżką ciśnienia bez przepustnicy (z ζ, którego
+przepustnica by tam wymagała). Komunikat podaje ΔP przed i po, pozostałe
+niezrównoważenie terminali z przepustnicą i czas obliczeń; sieć jest też
+zapisywana do **`%TEMP%\wenta_refit.json`**.
+`example-dampers-network.json` obok DLL to sieć referencyjna z
+przepustnicą na każdej gałęzi; samą nazwę pliku, której `WENTAWRITE` nie
+znajduje, wyszukuje się właśnie tam.
+
+### 3.21 Karta wstęgi „Wenta”
+
+Jeden panel z dwudziestoma jeden dużymi przyciskami, każdy uruchamia jedno polecenie:
 
 | Przycisk | Polecenie |
 |---|---|
@@ -475,9 +544,13 @@ Jeden panel z siedemnastoma dużymi przyciskami, każdy uruchamia jedno poleceni
 | Attenuators | `WENTAATTEN` |
 | Draw Network | `WENTAWRITE` |
 | Read Network | `WENTAREAD` |
+| Edit Properties | `WENTAPROPS` |
+| Move Component | `WENTAMOVE` |
+| Stretch Duct | `WENTASTRETCH` |
+| Re-fit Flow | `WENTAREFIT` |
 | Wenta Help | `WENTAHELP` |
 
-### 3.20 Plan rozwoju
+### 3.22 Plan rozwoju
 
 Polecenia takie jak `WENTAFITTING`
 są planowane, nie zaimplementowane; część biblioteczna kilku z nich już istnieje (patrz §4).
