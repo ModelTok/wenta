@@ -70,6 +70,7 @@ rem ---- Wenta.Core.dll ----
   "%ROOT%Wenta.Core\NetworkDrawing.cs" ^
   "%ROOT%Wenta.Core\Attenuators.cs" ^
   "%ROOT%Wenta.Core\NetworkEdit.cs" ^
+  "%ROOT%Wenta.Core\Schedule.cs" ^
   "%ROOT%Wenta.Core\Markdown.cs"
 if errorlevel 1 ( echo BUILD FAILED: Wenta.Core & exit /b 1 )
 

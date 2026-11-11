@@ -346,6 +346,12 @@ podążają za nimi, odgałęzienie do `t2` zachowuje Ø160), ustawia `dS` na
 ζ 0,05 przy otwartej przepustnicy odgałęzienia `dB` i zmienia ΔP z 2,59
 na 3,70 Pa bez pozostałego niezrównoważenia w około 6 ms; `WENTAREAD`
 odczytuje 3,70 Pa bez zmian.
+`WENTASCHEDULE` rysuje potem 12-wierszową tabelę zestawienia w
+(20000,−40000) (9 elementów, 11,000 m, sumy jak w `Bom`), `WENTAPROPS`
+`t2` przepływ 0,05 m³/s (4,54 Pa) i drugie `WENTASCHEDULE` aktualizują tę
+samą tabelę w miejscu (t2 0,0500 m³/s), `WENTAFLAT` w (0,−60000) rysuje
+rozwinięcia trzech przewodów okrągłych (9,048 m² blachy, π·D·L), a
+`WENTAREAD` odczytuje 4,54 Pa bez zmian.
 
 ### 3.13 `WENTAFAN` — wentylator w punkcie pracy
 
@@ -525,9 +531,42 @@ zapisywana do **`%TEMP%\wenta_refit.json`**.
 przepustnicą na każdej gałęzi; samą nazwę pliku, której `WENTAWRITE` nie
 znajduje, wyszukuje się właśnie tam.
 
-### 3.21 Karta wstęgi „Wenta”
+### 3.21 `WENTASCHEDULE` / `WENTAFLAT` — tabela zestawienia i rozwinięcia
 
-Jeden panel z dwudziestoma jeden dużymi przyciskami, każdy uruchamia jedno polecenie:
+Oba polecenia odczytują sieć narysowaną przez `WENTAWRITE` (§3.17) tak
+jak `WENTAREAD`, odmawiają, gdy rysunek nie przechodzi walidacji, i
+obliczają sieć.
+
+- **`WENTASCHEDULE`** rysuje zestawienie jako tabelę ZWCAD na warstwie
+  **`WENTA-SCHED`**: wiersz tytułu, nagłówek (Item, Branch, Kind,
+  Description, Length [m], Area [m2], Flow [m3/s], KNR code), jeden
+  wiersz na element, posortowany według rodzaju (źródło, przewody,
+  przewody elastyczne, kształtki, terminale), a potem identyfikatora, oraz
+  wiersz sum. Wiersze pochodzą z `Wenta.Bom` (§3.3), z numerem gałęzi,
+  który `Marking` nadaje każdemu przewodowi sztywnemu, a liczby są
+  zapisywane z kropką dziesiętną niezależnie od ustawień regionalnych
+  Windows. Pierwsze uruchomienie pyta o punkt wstawienia (lewy górny
+  narożnik); kolejne znajdują tabelę na `WENTA-SCHED` i **aktualizują ją
+  w miejscu**, więc po edycji (`WENTAPROPS`, `WENTAREFIT`) jedno
+  `WENTASCHEDULE` więcej ją uaktualnia. Polecenie zapisuje też
+  **`%TEMP%\wenta_schedule.xlsx`**, **`.json`** (formaty `BomExport`) i
+  **`.csv`** (tabela tak, jak jest narysowana). Kolumna Area to wielkość z
+  `Bom` (pole przekroju × długość, jak w `WENTABOM`); powierzchnię blachy
+  przewodów okrągłych podaje `WENTAFLAT`.
+- **`WENTAFLAT`** pyta o punkt bazowy i odstęp między elementami (mm,
+  domyślnie 500) i rysuje rozwinięcie każdego okrągłego przewodu
+  sztywnego na warstwie **`WENTA-FAB`** (najpierw czyszczonej): zamknięty
+  prostokąt obwód × długość (`Development.RoundDuctDevelopment`),
+  ułożony od lewej do prawej w kolejności identyfikatorów, z opisem
+  (identyfikator, wymiar i wymiary rozwinięcia). Przewody elastyczne i
+  prostokątne są wypisywane jako pominięte. Komunikat podaje liczbę
+  elementów i powierzchnię blachy; elementy są też zapisywane do
+  **`%TEMP%\wenta_flat.csv`**. Kształtek (kolan, redukcji) to polecenie
+  nie rozwija; `Development` ma ich rozwinięcia do użycia z kodu.
+
+### 3.22 Karta wstęgi „Wenta”
+
+Jeden panel z dwudziestoma trzema dużymi przyciskami, każdy uruchamia jedno polecenie:
 
 | Przycisk | Polecenie |
 |---|---|
@@ -551,9 +590,11 @@ Jeden panel z dwudziestoma jeden dużymi przyciskami, każdy uruchamia jedno pol
 | Move Component | `WENTAMOVE` |
 | Stretch Duct | `WENTASTRETCH` |
 | Re-fit Flow | `WENTAREFIT` |
+| Schedule Table | `WENTASCHEDULE` |
+| Flat Patterns | `WENTAFLAT` |
 | Wenta Help | `WENTAHELP` |
 
-### 3.22 Plan rozwoju
+### 3.23 Plan rozwoju
 
 Polecenia takie jak `WENTAFITTING`
 są planowane, nie zaimplementowane; część biblioteczna kilku z nich już istnieje (patrz §4).

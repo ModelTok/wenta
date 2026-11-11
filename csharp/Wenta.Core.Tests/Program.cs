@@ -65,6 +65,7 @@ namespace Wenta.Core.Tests
             RunAttenuators(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "catalogs"));
             RunSolverVentiSemantics();
             RunNetworkEdit();
+            RunSchedule();
             RunPerformance();
 
             Console.WriteLine();
@@ -2451,6 +2452,93 @@ namespace Wenta.Core.Tests
         }
 
         // #23 / #27: NetworkEdit on the reference network with its layout.
+        private static void RunSchedule()
+        {
+            Network net = ReferenceHandBuilt();
+            net.Solve();
+            Bom bom = Bom.Build(net);
+            ScheduleTable t = Schedule.Build(net, bom);
+
+            CheckInt("sched.rows", t.Rows.Count, bom.Rows.Count);
+            CheckInt("sched.rows_7", t.Rows.Count, 7);
+            CheckInt("sched.columns", t.Header.Length, 8);
+            CheckStr("sched.title", t.Title, "Wenta schedule: hand");
+            // Sorted by kind (source, duct, flex, fitting, terminal), then id.
+            string order = "";
+            foreach (string[] r in t.Rows) order += r[0] + " ";
+            CheckStr("sched.order", order, "src branch main straight tee t1 t2 ");
+            foreach (string[] r in t.Rows) CheckInt("sched.width_" + r[0], r.Length, 8);
+            // Branch numbers from Marking.
+            var marks = new Dictionary<string, uint>();
+            foreach (Mark m in Marking.AssignBranchMarks(net)) marks[m.ComponentId] = m.BranchNo;
+            foreach (string[] r in t.Rows)
+                if (marks.ContainsKey(r[0])) CheckStr("sched.branch_" + r[0], r[1], marks[r[0]].ToString(CultureInfo.InvariantCulture));
+            string[] mainRow = t.Rows.Find(r => r[0] == "main");
+            CheckStr("sched.main_kind", mainRow[2], "duct");
+            CheckStr("sched.main_length", mainRow[4], "5.000");
+            CheckStr("sched.main_area", mainRow[5], (Math.PI * 0.25 * 0.25 / 4.0 * 5.0).ToString("0.000", CultureInfo.InvariantCulture));
+            CheckStr("sched.main_flow", mainRow[6], "0.1000");
+            CheckStr("sched.tee_no_length", t.Rows.Find(r => r[0] == "tee")[4], "");
+            CheckStr("sched.totals_length", t.Totals[4], bom.TotalLength.ToString("0.000", CultureInfo.InvariantCulture));
+            CheckStr("sched.totals_length_11", t.Totals[4], "11.000");
+            CheckStr("sched.totals_area", t.Totals[5], bom.TotalArea.ToString("0.000", CultureInfo.InvariantCulture));
+            CheckStr("sched.totals_items", t.Totals[2], "7 items");
+            CheckInt("sched.all_rows", t.AllRows().Count, 9);
+
+            // Invariant culture whatever the thread culture is.
+            CultureInfo saved = System.Threading.Thread.CurrentThread.CurrentCulture;
+            try
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = new CultureInfo("pl-PL");
+                ScheduleTable pl = Schedule.Build(net, Bom.Build(net));
+                CheckStr("sched.pl_length", pl.Rows.Find(r => r[0] == "main")[4], "5.000");
+                CheckStr("sched.pl_terminal_desc", pl.Rows.Find(r => r[0] == "t1")[3], "terminal 0.06 m3/s");
+                CheckTrue("sched.pl_tee_desc", pl.Rows.Find(r => r[0] == "tee")[3].Contains("z=0.5"));
+            }
+            finally { System.Threading.Thread.CurrentThread.CurrentCulture = saved; }
+
+            string csv = t.ToCsv();
+            string[] lines = csv.TrimEnd('\n').Split('\n');
+            CheckInt("sched.csv_lines", lines.Length, 9);
+            CheckTrue("sched.csv_header", lines[0].StartsWith("Item,Branch,Kind,Description,", StringComparison.Ordinal));
+            CheckTrue("sched.csv_quoted_comma", csv.Contains("\"tee (straight z=0, branch z=0.5)\""));
+            CheckTrue("sched.csv_total", lines[8].StartsWith("Total,", StringComparison.Ordinal));
+            ExpectError(true, "sched.err_null", () => Schedule.Build(null, bom));
+
+            // Flat patterns: round rigid ducts, circumference × length, side by side.
+            FlatPatternSet f = Schedule.FlatPatterns(net, new Point2(1000.0, 2000.0), 500.0);
+            CheckInt("flat.count", f.Patterns.Count, 3);
+            CheckStr("flat.first", f.Patterns[0].ItemId, "branch");
+            Check("flat.branch_width", f.Patterns[0].Piece.WidthM, Math.PI * 0.16, 1e-12);
+            Check("flat.branch_length", f.Patterns[0].Piece.LengthM, 3.0, 1e-12);
+            Check("flat.branch_x0", f.Patterns[0].OutlineMm[0].X, 1000.0, 1e-9);
+            Check("flat.branch_y0", f.Patterns[0].OutlineMm[0].Y, 2000.0, 1e-9);
+            Check("flat.branch_x1", f.Patterns[0].OutlineMm[1].X, 1000.0 + Math.PI * 160.0, 1e-9);
+            Check("flat.branch_y2", f.Patterns[0].OutlineMm[2].Y, 5000.0, 1e-9);
+            Check("flat.main_x0", f.Patterns[1].OutlineMm[0].X, 1000.0 + Math.PI * 160.0 + 500.0, 1e-9);
+            Check("flat.straight_x0", f.Patterns[2].OutlineMm[0].X, 1000.0 + Math.PI * 410.0 + 1000.0, 1e-9);
+            Check("flat.total_area", f.TotalAreaM2, Math.PI * (0.16 * 3.0 + 0.25 * 5.0 + 0.2 * 3.0), 1e-12);
+            CheckTrue("flat.label_below", f.Patterns[0].LabelAtMm.Y < 2000.0);
+            CheckTrue("flat.description", f.Patterns[1].Description.StartsWith("Ø250 × 5 m, flat 785 × 5000 mm", StringComparison.Ordinal));
+            CheckInt("flat.no_skipped", f.Skipped.Count, 0);
+            CheckInt("flat.csv_lines", f.ToCsv().TrimEnd('\n').Split('\n').Length, 4);
+            ExpectError(true, "flat.err_gap", () => Schedule.FlatPatterns(net, new Point2(0.0, 0.0), -1.0));
+
+            var mixed = new Network { Name = "mixed" };
+            mixed.Add("src", new Source("AHU"));
+            mixed.Add("r", new RigidDuct("r", new Rectangular(0.4, 0.2), 2.0));
+            mixed.Add("f", new FlexDuct("f", 0.16, 1.0, 1.0));
+            mixed.Add("t", new Terminal("t", 0.1, null, 0.0));
+            mixed.Connect("src", "r.inlet");
+            mixed.Connect("r.outlet", "f.inlet");
+            mixed.Connect("f.outlet", "t");
+            FlatPatternSet fm = Schedule.FlatPatterns(mixed, new Point2(0.0, 0.0), 100.0);
+            CheckInt("flat.mixed_none", fm.Patterns.Count, 0);
+            CheckInt("flat.mixed_skipped", fm.Skipped.Count, 2);
+            CheckTrue("flat.skip_flex", fm.Skipped.Exists(s => s.StartsWith("f: flexible", StringComparison.Ordinal)));
+            CheckTrue("flat.skip_rect", fm.Skipped.Exists(s => s.StartsWith("r: rectangular", StringComparison.Ordinal)));
+        }
+
         private static void RunNetworkEdit()
         {
             Network net = ReferenceHandBuilt();

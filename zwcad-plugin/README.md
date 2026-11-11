@@ -29,6 +29,8 @@ Mojo, Rust or WASM at runtime.
 | `WENTAMOVE` | Moves a drawn tee, fitting, damper or terminal by a displacement; the joined ducts' ends follow and take the drawn length (`NetworkEdit.Move`) |
 | `WENTASTRETCH` | New length for a drawn duct; its end and everything downstream move with it (`NetworkEdit.Stretch`) |
 | `WENTAREFIT` | New flow at one terminal: re-sizes the legs feeding it (`ReFit.Apply`), re-solves and sets each `damper`-role fitting to balance its terminal (`NetworkEdit.ReFlow`), all in one command; `%TEMP%\wenta_refit.json` |
+| `WENTASCHEDULE` | Schedule table of the drawn network on `WENTA-SCHED` (Bom rows with branch numbers, sorted, totals; `Schedule.Build`), updated in place on a re-run; `%TEMP%\wenta_schedule.xlsx`, `.json`, `.csv` |
+| `WENTAFLAT` | Flat developments of the round rigid ducts (circumference × length, `Development`) as closed outlines with labels on `WENTA-FAB`; `%TEMP%\wenta_flat.csv` |
 | `WENTAHELP` | Command list and the paths of the EN/PL user guides; optionally opens one as HTML (built from the Markdown by `tools/MakeHelp.cs`) |
 
 ## UI
@@ -77,7 +79,9 @@ inserts and draws two attenuators, no room stays over the limit, and ΔP
 goes from 5.14 to 6.84 Pa, which `WENTAREAD` reads back; then `WENTAPROPS` (Ø270 → Ø300),
 `WENTASTRETCH`, `WENTAMOVE` and a terminal flow edit take it to 7.22 Pa and `WENTAREAD` finds no
 length edits and the same GUIDs; on `example-dampers-network.json`, `WENTAREFIT` (t1 0.2 m³/s)
-re-sizes the main and straight run to Ø300, sets damper `dS` to ζ 0.05 and gives 3.70 Pa, balanced, in about 6 ms —
+re-sizes the main and straight run to Ø300, sets damper `dS` to ζ 0.05 and gives 3.70 Pa, balanced, in about 6 ms;
+`WENTASCHEDULE` draws the 12-row table, a flow edit and a second `WENTASCHEDULE` update it in place, and
+`WENTAFLAT` draws three flat pieces (9.048 m²) —
 the values `Wenta.Core` computes for the layout.
 
 ## ZWCAD platform facts (hard-won, keep)

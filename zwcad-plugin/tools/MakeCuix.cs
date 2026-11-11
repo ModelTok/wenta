@@ -400,6 +400,26 @@ namespace WentaZwcad.Tools
         <LargeImage Name=""wenta_panel_32.png"" />
       </Macro>
     </MenuMacro>
+    <MenuMacro UID=""WENTA_SCHEDULE"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_SCHEDULE_NM"">Schedule Table</Name>
+        <Command>^C^C_.WENTASCHEDULE</Command>
+        <HelpString xlate=""true"" UID=""WENTA_SCHEDULE_HS"">Draw or update the schedule table of the drawn network and export XLSX, JSON and CSV: WENTASCHEDULE</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_panel_32.png"" />
+      </Macro>
+    </MenuMacro>
+    <MenuMacro UID=""WENTA_FLAT"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_FLAT_NM"">Flat Patterns</Name>
+        <Command>^C^C_.WENTAFLAT</Command>
+        <HelpString xlate=""true"" UID=""WENTA_FLAT_HS"">Draw the flat developments of the round ducts for fabrication: WENTAFLAT</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_duct_32.png"" />
+      </Macro>
+    </MenuMacro>
     <MenuMacro UID=""WENTA_HELP"">
       <Macro type=""Any"">
         <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
@@ -503,6 +523,14 @@ namespace WentaZwcad.Tools
         </RibbonCommandButton>
         <RibbonCommandButton UID=""WENTA_RBTN_REFIT"" Id=""ZwRibbonCommandButton"" Text=""Re-fit Flow"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_REFIT"" KeyTip="""">
           <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_REFIT_TT"">Re-fit Flow</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_SCHEDULE"" Id=""ZwRibbonCommandButton"" Text=""Schedule Table"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_SCHEDULE"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_SCHEDULE_TT"">Schedule Table</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_FLAT"" Id=""ZwRibbonCommandButton"" Text=""Flat Patterns"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_FLAT"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_FLAT_TT"">Flat Patterns</TooltipTitle>
           <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
         </RibbonCommandButton>
         <RibbonCommandButton UID=""WENTA_RBTN_HELP"" Id=""ZwRibbonCommandButton"" Text=""Wenta Help"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_HELP"" KeyTip="""">

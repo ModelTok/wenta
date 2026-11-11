@@ -152,3 +152,15 @@ Velocity
 4
 _.WENTAREAD
 %TEMP%\wenta_read6.json
+_.WENTASCHEDULE
+20000,-40000
+_.WENTAPROPS
+t2
+flow
+0.05
+_.WENTASCHEDULE
+_.WENTAFLAT
+0,-60000
+500
+_.WENTAREAD
+%TEMP%\wenta_read7.json

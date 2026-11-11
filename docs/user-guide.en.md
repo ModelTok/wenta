@@ -322,6 +322,12 @@ feeding it from Ø250 / Ø200 to Ø300 (the tee and damper `dS` follow, the
 branch to `t2` keeps Ø160), sets `dS` to ζ 0.05 with the branch damper
 `dB` open, and takes 2.59 → 3.70 Pa with no residual imbalance in about
 6 ms; `WENTAREAD` reads 3.70 Pa back with no edits.
+`WENTASCHEDULE` then draws the 12-row schedule table at (20000,−40000)
+(9 items, 11.000 m, totals as `Bom`), `WENTAPROPS` `t2` flow 0.05 m³/s
+(4.54 Pa) and a second `WENTASCHEDULE` update the same table in place
+(t2 0.0500 m³/s), `WENTAFLAT` at (0,−60000) draws the three round ducts
+flat (9.048 m² of sheet, π·D·L) and `WENTAREAD` reads 4.54 Pa with no
+edits.
 
 ### 3.13 `WENTAFAN` — fan at the duty point
 
@@ -490,9 +496,39 @@ the time taken; the network is also saved to
 the DLL, is the reference network with a damper on each run; a bare file
 name that `WENTAWRITE` does not find is looked up there.
 
-### 3.21 Ribbon tab "Wenta"
+### 3.21 `WENTASCHEDULE` / `WENTAFLAT` — schedule table and flat patterns
 
-One panel with twenty-one large buttons, each running one command:
+Both commands read the network drawn by `WENTAWRITE` (§3.17) as
+`WENTAREAD` does, refuse a drawing that does not validate, and solve it.
+
+- **`WENTASCHEDULE`** draws the schedule as a ZWCAD table on layer
+  **`WENTA-SCHED`**: a title row, the header (Item, Branch, Kind,
+  Description, Length [m], Area [m2], Flow [m3/s], KNR code), one row per
+  component sorted by kind (source, ducts, flexible ducts, fittings,
+  terminals) and then by id, and a totals row. The rows are `Wenta.Bom`'s
+  (§3.3), with the branch number `Marking` gives each rigid duct, and the
+  numbers are written with a decimal point whatever the Windows locale.
+  The first run asks for the insertion point (top left); later runs find
+  the table on `WENTA-SCHED` and **update it in place** at its position,
+  so after an edit (`WENTAPROPS`, `WENTAREFIT`) one more `WENTASCHEDULE`
+  brings it up to date. It also writes **`%TEMP%\wenta_schedule.xlsx`**,
+  **`.json`** (the `BomExport` formats) and **`.csv`** (the table as
+  drawn). Area is Bom's quantity (cross-section area × length, as in
+  `WENTABOM`); the sheet area of the round ducts is `WENTAFLAT`'s.
+- **`WENTAFLAT`** asks for a base point and the gap between pieces (mm,
+  default 500) and draws the flat development of every round rigid duct
+  on layer **`WENTA-FAB`** (cleared first): a closed rectangle of
+  circumference × length (`Development.RoundDuctDevelopment`), laid out
+  left to right in id order, labelled with the id, size and flat
+  dimensions. Flexible and rectangular ducts are listed as skipped. The
+  message gives the number of pieces and the sheet area; the pieces are
+  also written to **`%TEMP%\wenta_flat.csv`**. Fittings (elbows, reducers)
+  are not developed by this command; `Development` has their
+  developments for use from code.
+
+### 3.22 Ribbon tab "Wenta"
+
+One panel with twenty-three large buttons, each running one command:
 
 | Button | Command |
 |---|---|
@@ -516,9 +552,11 @@ One panel with twenty-one large buttons, each running one command:
 | Move Component | `WENTAMOVE` |
 | Stretch Duct | `WENTASTRETCH` |
 | Re-fit Flow | `WENTAREFIT` |
+| Schedule Table | `WENTASCHEDULE` |
+| Flat Patterns | `WENTAFLAT` |
 | Wenta Help | `WENTAHELP` |
 
-### 3.22 Roadmap
+### 3.23 Roadmap
 
 Commands such as `WENTAFITTING`
 are planned, not implemented; the library half of several of them already exists (see §4).
