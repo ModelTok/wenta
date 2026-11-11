@@ -44,6 +44,7 @@ if not exist "%OUT%" mkdir "%OUT%"
   "%SRC%\RoundTripCommands.cs" ^
   "%SRC%\EditCommands.cs" ^
   "%SRC%\ScheduleCommands.cs" ^
+  "%SRC%\LabelCommands.cs" ^
   "%CORE%\Units.cs" ^
   "%CORE%\Fluid.cs" ^
   "%CORE%\Geometry.cs" ^
@@ -88,6 +89,7 @@ if not exist "%OUT%" mkdir "%OUT%"
   "%CORE%\Attenuators.cs" ^
   "%CORE%\NetworkEdit.cs" ^
   "%CORE%\Schedule.cs" ^
+  "%CORE%\Annotation.cs" ^
   "%CORE%\Markdown.cs"
 
 if errorlevel 1 ( echo BUILD FAILED & exit /b 1 )
@@ -96,6 +98,7 @@ copy /y "%REPO%\csharp\catalogs\example-generic.json" "%OUT%" >nul
 copy /y "%REPO%\csharp\catalogs\example-fans.json" "%OUT%" >nul
 copy /y "%REPO%\csharp\catalogs\example-attenuators.json" "%OUT%" >nul
 copy /y "%REPO%\csharp\examples\example-dampers-network.json" "%OUT%" >nul
+copy /y "%REPO%\csharp\examples\example-label-style.json" "%OUT%" >nul
 copy /y "%REPO%\docs\user-guide.en.md" "%OUT%" >nul
 copy /y "%REPO%\docs\user-guide.pl.md" "%OUT%" >nul
 
@@ -125,5 +128,5 @@ if errorlevel 1 ( echo BUILD FAILED: MakeCuix & exit /b 1 )
 "%OUT%\MakeCuix.exe" "%OUT%"
 if errorlevel 1 ( echo BUILD FAILED: Wenta.CUIX & exit /b 1 )
 
-echo BUILD OK: %OUT%\WentaZwcad.dll  (+ example-generic.json, example-fans.json, example-attenuators.json, example-dampers-network.json, user guides)
+echo BUILD OK: %OUT%\WentaZwcad.dll  (+ example-generic.json, example-fans.json, example-attenuators.json, example-dampers-network.json, example-label-style.json, user guides)
 endlocal

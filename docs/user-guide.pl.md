@@ -352,6 +352,12 @@ odczytuje 3,70 Pa bez zmian.
 samą tabelę w miejscu (t2 0,0500 m³/s), `WENTAFLAT` w (0,−60000) rysuje
 rozwinięcia trzech przewodów okrągłych (9,048 m² blachy, π·D·L), a
 `WENTAREAD` odczytuje 4,54 Pa bez zmian.
+Na końcu `WENTALABEL` opisuje trzy przewody, `WENTAPROPS` `branch` Ø200
+sam odświeża jeden opis, a kolejne `WENTALABEL` nie znajduje zmian;
+`WENTALABEL` `example-label-style.json` zmienia styl wszystkich trzech w
+jednym przebiegu, `WENTASTRETCH` `branch` do 4 m przesuwa jego opis,
+ponowne `WENTALABEL` nie znajduje zmian, a `WENTAREAD` odczytuje 3,89 Pa
+bez zmian.
 
 ### 3.13 `WENTAFAN` — wentylator w punkcie pracy
 
@@ -564,9 +570,42 @@ obliczają sieć.
   **`%TEMP%\wenta_flat.csv`**. Kształtek (kolan, redukcji) to polecenie
   nie rozwija; `Development` ma ich rozwinięcia do użycia z kodu.
 
-### 3.22 Karta wstęgi „Wenta”
+### 3.22 `WENTALABEL` — inteligentne opisy aktualizowane po edycji
 
-Jeden panel z dwudziestoma trzema dużymi przyciskami, każdy uruchamia jedno polecenie:
+Opisuje każdy przewód sieci narysowanej przez `WENTAWRITE` (§3.17)
+jednym wstawieniem bloku **`WENTA_LABEL`** na warstwie `WENTA-ANNO`, pod
+najdłuższym odcinkiem. Blok ma sześć atrybutów: `ID`, `BRANCH`, `SIZE`,
+`FLOW`, `VEL` i `DPM` (identyfikator, numer gałęzi, wymiar, przepływ w
+m³/s, prędkość w m/s i spadek ciśnienia w Pa/m z obliczonej sieci), więc
+można je wyciągnąć do tabeli atrybutów albo pola. Numery gałęzi pochodzą
+z `Marking`: przewody sztywne są numerowane wszerz od źródła według
+topologii (przy każdym rozgałęzieniu w kolejności identyfikatorów), a
+nie kolejności rysowania, więc częściowe przerysowanie ani edycja nie
+zmieniają numeracji. Znacznik przewodu przechowuje uchwyt opisu.
+
+- **Automatyczna aktualizacja.** Gdy rysunek ma już opisy, `WENTAPROPS`,
+  `WENTAMOVE`, `WENTASTRETCH`, `WENTAREFIT`, `WENTAATTEN`, aktualizacja
+  przez `WENTAWRITE` i `WENTAREAD`, które przejmuje zmienione długości,
+  obliczają sieć ponownie i odświeżają wszystkie opisy w miejscu: nowe
+  wartości i położenia, brakujące opisy są dodawane, a opisy usuniętych
+  przewodów usuwane. Komunikat podaje liczbę zmienionych.
+- **Styl.** Polecenie pyta o plik JSON stylu opisów; Enter zachowuje
+  styl zapisany w rysunku (za pierwszym razem domyślny). Styl jest
+  zapisywany w rysunku i stosowany do wszystkich opisów w tym samym
+  przebiegu, więc jedna zmiana zmienia cały rysunek. Klucze, wszystkie
+  opcjonalne: `fields` (widoczne atrybuty i ich kolejność: `id`,
+  `branch`, `size`, `flow`, `velocity`, `dpm`), `text_height_mm` (100),
+  `offset_mm` (−250, od osi przewodu), `flow_decimals` (3),
+  `velocity_decimals` (2), `dpm_decimals` (2) i `schema_version` (1).
+  Ukryte pola pozostają w bloku jako niewidoczne atrybuty.
+  `example-label-style.json` obok DLL pokazuje identyfikator, wymiar i
+  przepływ przy wysokości 150 mm; samą nazwę pliku wyszukuje się tam.
+- Komunikat podaje opisy nowe, zaktualizowane, zmienione i usunięte;
+  `WENTALABEL` zaraz po edycji zgłasza 0 zmienionych.
+
+### 3.23 Karta wstęgi „Wenta”
+
+Jeden panel z dwudziestoma czterema dużymi przyciskami, każdy uruchamia jedno polecenie:
 
 | Przycisk | Polecenie |
 |---|---|
@@ -592,9 +631,10 @@ Jeden panel z dwudziestoma trzema dużymi przyciskami, każdy uruchamia jedno po
 | Re-fit Flow | `WENTAREFIT` |
 | Schedule Table | `WENTASCHEDULE` |
 | Flat Patterns | `WENTAFLAT` |
+| Smart Labels | `WENTALABEL` |
 | Wenta Help | `WENTAHELP` |
 
-### 3.23 Plan rozwoju
+### 3.24 Plan rozwoju
 
 Polecenia takie jak `WENTAFITTING`
 są planowane, nie zaimplementowane; część biblioteczna kilku z nich już istnieje (patrz §4).

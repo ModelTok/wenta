@@ -328,6 +328,11 @@ branch to `t2` keeps Ø160), sets `dS` to ζ 0.05 with the branch damper
 (t2 0.0500 m³/s), `WENTAFLAT` at (0,−60000) draws the three round ducts
 flat (9.048 m² of sheet, π·D·L) and `WENTAREAD` reads 4.54 Pa with no
 edits.
+Last, `WENTALABEL` labels the three ducts, `WENTAPROPS` `branch` Ø200
+refreshes one label by itself and a following `WENTALABEL` finds 0
+changed; `WENTALABEL` `example-label-style.json` restyles all three in
+one run, `WENTASTRETCH` `branch` to 4 m moves its label, `WENTALABEL`
+again finds 0 changed, and `WENTAREAD` reads 3.89 Pa with no edits.
 
 ### 3.13 `WENTAFAN` — fan at the duty point
 
@@ -526,9 +531,41 @@ Both commands read the network drawn by `WENTAWRITE` (§3.17) as
   are not developed by this command; `Development` has their
   developments for use from code.
 
-### 3.22 Ribbon tab "Wenta"
+### 3.22 `WENTALABEL` — smart labels that follow edits
 
-One panel with twenty-three large buttons, each running one command:
+Labels every duct of the network drawn by `WENTAWRITE` (§3.17) with one
+**`WENTA_LABEL`** block reference on `WENTA-ANNO`, below the longest
+segment. The block has six attributes, `ID`, `BRANCH`, `SIZE`, `FLOW`,
+`VEL` and `DPM` (id, branch number, size, flow in m³/s, velocity in m/s
+and pressure drop in Pa/m from the solved network), so a block attribute
+extract or a field can use them. Branch numbers are `Marking`'s: rigid
+ducts are numbered breadth-first from the source by topology (ids in
+order at each split), not by draw order, so a partial re-draw or an edit
+does not renumber them. The duct's tag keeps the label's handle.
+
+- **Auto-update.** Once a drawing has labels, `WENTAPROPS`,
+  `WENTAMOVE`, `WENTASTRETCH`, `WENTAREFIT`, `WENTAATTEN`, a
+  `WENTAWRITE` update and a `WENTAREAD` that takes edited lengths
+  re-solve the network and refresh every label in place: new values and
+  positions, missing labels added, labels of erased ducts removed. The
+  message gives the number changed.
+- **Style.** The prompt takes a label style JSON; Enter keeps the style
+  stored in the drawing (the default the first time). The style is
+  stored in the drawing and applied to every label in the same run, so
+  changing it once restyles the whole drawing. Keys, all optional:
+  `fields` (which attributes are visible and in what order: `id`,
+  `branch`, `size`, `flow`, `velocity`, `dpm`), `text_height_mm` (100),
+  `offset_mm` (−250, from the duct centreline), `flow_decimals` (3),
+  `velocity_decimals` (2), `dpm_decimals` (2) and `schema_version` (1).
+  Hidden fields stay in the block as invisible attributes.
+  `example-label-style.json`, next to the DLL, shows id, size and flow
+  at 150 mm; a bare file name is looked up there.
+- The message gives the labels new, updated, changed and removed;
+  `WENTALABEL` straight after an edit reports 0 changed.
+
+### 3.23 Ribbon tab "Wenta"
+
+One panel with twenty-four large buttons, each running one command:
 
 | Button | Command |
 |---|---|
@@ -554,9 +591,10 @@ One panel with twenty-three large buttons, each running one command:
 | Re-fit Flow | `WENTAREFIT` |
 | Schedule Table | `WENTASCHEDULE` |
 | Flat Patterns | `WENTAFLAT` |
+| Smart Labels | `WENTALABEL` |
 | Wenta Help | `WENTAHELP` |
 
-### 3.23 Roadmap
+### 3.24 Roadmap
 
 Commands such as `WENTAFITTING`
 are planned, not implemented; the library half of several of them already exists (see §4).

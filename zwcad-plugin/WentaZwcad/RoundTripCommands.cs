@@ -79,6 +79,7 @@ namespace WentaZwcad
                         stale));
                 Commands.Log(string.Format(C, "WENTAWRITE ok  {0} components  new {1}  updated {2}  stale {3}  {4}",
                     items.Count, created, updated, stale, Path.GetFileName(path)));
+                if (stale == 0) LabelCommands.RefreshIfPresent(doc, "WENTAWRITE");
             }
             catch (WentaException ex)
             {
@@ -149,6 +150,7 @@ namespace WentaZwcad
                     r.Network.Components.Count, r.LengthUpdated.Count, r.Ignored, dp.ToString("0.00", C), path));
                 Commands.Log(string.Format(C, "WENTAREAD ok  {0} components  edits {1}  other {2}  {3:R} Pa  {4}",
                     r.Network.Components.Count, r.LengthUpdated.Count, r.Ignored, dp, Path.GetFileName(path)));
+                if (r.LengthUpdated.Count > 0) LabelCommands.RefreshIfPresent(doc, "WENTAREAD");
             }
             catch (WentaException ex)
             {
@@ -159,7 +161,7 @@ namespace WentaZwcad
 
         // ------------------------------------------------------------- WENTAATTEN
 
-        private static string PluginDir()
+        internal static string PluginDir()
         {
             return Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
         }
@@ -246,6 +248,7 @@ namespace WentaZwcad
                     json, Path.Combine(Path.GetTempPath(), "wenta_atten.csv")));
                 Commands.Log(string.Format(C, "WENTAATTEN ok  {0}  rooms {1}  inserted {2}  drawn {3}  over {4}  dp {5:R} -> {6:R} Pa",
                     space, res.Rooms.Count, res.Inserted, created, loud, before, res.CriticalPa));
+                if (res.Inserted > 0) LabelCommands.RefreshIfPresent(doc, "WENTAATTEN");
             }
             catch (WentaException ex)
             {

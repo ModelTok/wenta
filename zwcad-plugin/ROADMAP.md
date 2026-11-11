@@ -106,7 +106,8 @@ Where Ventpack wins today; a full phase, not an afterthought:
 3. **Auto-network recognition** — trace polylines → `Network`. Engine done:
    `Topology.Trace`. Ships as `WENTATRACE` (#19).
 4. **Smart annotation** — branch numbering (`Marking` ✓), size/flow/
-   velocity labels as parametric blocks, auto-update on edit. #59.
+   velocity labels as parametric blocks, auto-update on edit: `WENTALABEL`
+   ✓ ships (#59).
 5. **Intelligent sections** — section view at any angle, section entities
    excluded from BOM (Phase 5). #58 — no engine half.
 6. Palette = modeless sizing form (live preview), ribbon = command
@@ -130,7 +131,7 @@ The modules `venti` proved out are all in C# now (library half done in
 | `fan` (curves, duty point, power) | `Fan.cs` + `FanCatalog.cs` | ✓ | `WENTAFAN` ships (#50) |
 | `insulation` (condensation / heat-loss thickness) | `Insulation.cs` | ✓ | `WENTAINSULATE` ships, round runs (#51) |
 | `standards` (EN / ASHRAE / DIN tables) | `Standards.cs` | ✓ (#52) | — |
-| `analysis` / `marking` | `Analysis.cs` `Marking.cs` | ✓ | #59 |
+| `analysis` / `marking` | `Analysis.cs` `Marking.cs` `Annotation.cs` | ✓ | `WENTALABEL` ships (#59) |
 | `results` / `settings` / `electrical` | `Results.cs` `Settings.cs` `Electrical.cs` | ✓ | — |
 | `re` (Re/size ζ corrections) | `ReCorrections.cs` | ✓ | #21 |
 | `topology` (polylines → network, flatten) | `Topology.cs` | ✓ | `WENTATRACE` ships (#19) |

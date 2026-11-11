@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "fields": ["id", "size", "flow"],
+  "text_height_mm": 150,
+  "offset_mm": -300,
+  "flow_decimals": 2
+}

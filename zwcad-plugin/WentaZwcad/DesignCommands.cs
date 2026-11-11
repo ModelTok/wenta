@@ -308,6 +308,7 @@ namespace WentaZwcad
             new[] { "WENTAREFIT", "new terminal flow: re-size, re-solve and re-set dampers" },
             new[] { "WENTASCHEDULE", "schedule table of the drawn network; XLSX, JSON and CSV" },
             new[] { "WENTAFLAT", "flat developments of the round ducts for fabrication" },
+            new[] { "WENTALABEL", "smart duct labels (size, flow, velocity, Pa/m); follow edits" },
             new[] { "WENTAHELLO", "version banner" },
             new[] { "WENTAHELP", "this list and the user guide" },
         };
