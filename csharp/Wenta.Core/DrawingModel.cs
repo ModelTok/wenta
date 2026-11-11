@@ -636,4 +636,54 @@ namespace Wenta
             return rooms;
         }
     }
+
+    public sealed class InsulationSizing
+    {
+        public double DiameterM;
+        public double RequiredM;
+        public double SelectedM;
+        public double HeatLossWPerM;   // with the selected thickness
+    }
+
+    public static class DrawingInsulation
+    {
+        public const string Condensation = "condensation";
+        public const string HeatLoss = "heatloss";
+
+        // WENTAINSULATE for one round run: the EN ISO 12241 thickness from
+        // Insulation (condensation or heat-loss purpose), snapped to the
+        // standard step, and the heat loss with that step. Insulation's
+        // model is cylindrical, so rectangular sections are refused rather
+        // than approximated. When no insulation is required (the bare duct
+        // already meets the purpose) SelectedM is 0, not the smallest step.
+        public static InsulationSizing Size(CrossSection section, string purpose, string material,
+            double airTempC, double ambientTempC, double dewPointC, double targetWPerM)
+        {
+            Round r = section as Round;
+            if (r == null)
+                throw new WentaException("insulation is sized for round ducts only (got "
+                    + DrawingSizing.SizeText(section) + ")");
+            double k;
+            if (!Insulation.MaterialConductivity(material, out k))
+                throw new WentaException("unknown insulation material '" + material + "'");
+            double req;
+            if (purpose == Condensation)
+                req = Insulation.RequiredThicknessCondensation(airTempC, dewPointC, ambientTempC, k,
+                    r.Diameter, Insulation.DefaultInnerHtc, Insulation.DefaultOuterHtc);
+            else if (purpose == HeatLoss)
+                req = Insulation.RequiredThicknessHeatLoss(airTempC, ambientTempC, targetWPerM, k,
+                    r.Diameter, Insulation.DefaultInnerHtc, Insulation.DefaultOuterHtc);
+            else
+                throw new WentaException("unknown insulation purpose '" + purpose + "'");
+            double sel = req > 0.0 ? Insulation.SelectThickness(req) : 0.0;
+            return new InsulationSizing
+            {
+                DiameterM = r.Diameter,
+                RequiredM = req,
+                SelectedM = sel,
+                HeatLossWPerM = Insulation.HeatLossWithInsulation(airTempC, ambientTempC, k, r.Diameter, sel,
+                    Insulation.DefaultInnerHtc, Insulation.DefaultOuterHtc),
+            };
+        }
+    }
 }

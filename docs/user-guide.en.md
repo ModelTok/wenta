@@ -105,7 +105,7 @@ remain in the ZWCAD profile until it is unloaded with `MENULOAD`/`CUI`.
 
 ## 3. Commands reference
 
-Ten commands exist. Every command appends one line to the evidence log
+Fourteen commands exist. Every command appends one line to the evidence log
 `%TEMP%\wenta_zwcad_test.txt` (e.g. `WENTADUCT ok  200×200 mm  0,150 m3/s
 3,75 m/s  0,9530 Pa/m`). Sizing and pressure-drop maths is done by
 `Wenta.Core`; no formula lives in the plugin.
@@ -295,11 +295,66 @@ wrapper script with `FILEDIA 0`). Verified on ZWCAD 2021: `WENTATRACE`
 Ø150 straight, Ø125 branch) 8.00 Pa, and a second `WENTASIZE` updated the
 three labels without adding any; `WENTABALANCE` ζ 0.15 / 93 % open for the
 straight-run terminal, while the branch is the critical path and its damper
-stays fully open. These are the values `Wenta.Core` computes for the layout.
+stays fully open. It then runs `WENTAFAN` (extra 150 Pa: `ExampleFan EF-160`
+at 0.12 m³/s and 160.7 Pa), `WENTAINSULATE` twice (20 mm mineral wool on
+every run, the second run updating the three labels), `WENTASOUND` and
+`WENTAHELP`. These are the values `Wenta.Core` computes for the layout.
 
-### 3.13 Ribbon tab "Wenta"
+### 3.13 `WENTAFAN` — fan at the duty point
 
-One panel with ten large buttons, each running one command:
+Select the network (as for §3.8). Prompts: site altitude, `Extra pressure
+outside the ductwork (AHU, filters, coils) [Pa] <0>` and the fan catalog
+file (Enter takes `example-fans.json` beside the DLL). The duty point is the
+total terminal flow and the critical-path Δp plus the extra pressure
+(`FanSelection.DutyPoint`). Every fan in the catalog is listed with the
+pressure its curve gives at the duty flow, the margin, and the power
+Q·p/η at the duty point when the fan meets it and has an efficiency
+(`Fan.Margin`, `Fan.Power`, §4.11). The selected fan, marked `*`, is the
+first one in catalog order that meets the duty point (`Fan.PickFan`); it is
+written into the source marker's tag (`fan_id`, `fan_flow_m3s`,
+`fan_required_pa`, `fan_margin_pa`, `fan_power_w`). The catalog format is in
+§5.4; the example fans are fictional.
+
+### 3.14 `WENTAINSULATE` — insulation thickness per run
+
+Select sized centrelines (runs without a size in their `WENTA` tag are
+skipped; run `WENTASIZE` first). Prompts: purpose `[Condensation/HeatLoss]`,
+material `[MineralWool/PeFoam/Epdm/Pir/PuFoam]`, the air temperature in the
+duct, the ambient temperature and then either the ambient dew point
+(condensation) or the heat-loss limit in W/m. For every round run it takes
+the required thickness from `Insulation` (EN ISO 12241, §4.12), rounds it up
+to the next standard step and reports the heat loss with that step. If the
+bare duct already meets the purpose, it reports no insulation needed rather
+than the smallest step. The result goes into the run's tag (`insul_mm`,
+`insul_required_mm`, `insul_material`, `insul_purpose`,
+`insul_heat_loss_w_per_m`) and into a label on layer `WENTA-INSUL`, for
+example `INS 20 mm mineral_wool (condensation)`. Running it again updates
+the labels in place. Rectangular runs are skipped with a message, because
+the library's model is cylindrical. Insulation adds to the outer size of the
+duct, which the 3D and clash work in the roadmap has to allow for.
+
+### 3.15 `WENTASOUND` — room sound per terminal
+
+Select the network. Prompts: space type
+`[studio/bedroom/office/classroom/retail/industrial]`, the room surface
+area (m²) and the mean absorption coefficient α. For every terminal it takes
+the regenerated noise of the run feeding it and carries it into the room
+with the room equation, then checks the result against the space type's
+limit (`DrawingSound.Rooms`, §4.10). Rooms are listed worst first, the
+values go into the terminal markers' tags (`sound_lp_db`, `sound_nc_limit`,
+`sound_ok`), and the table is written to **`%TEMP%\wenta_sound.csv`**.
+Attenuator selection (`WENTAATTEN`) is not implemented yet.
+
+### 3.16 `WENTAHELP` — command list and user guide
+
+Prints every command with a one-line description and the paths of the
+English and Polish user guides, which `install.ps1` copies next to the DLL.
+The prompt `Open the user guide [English/Polski/No] <No>` opens the chosen
+guide (a Markdown file) with the program Windows associates with `.md`.
+
+### 3.17 Ribbon tab "Wenta"
+
+One panel with fourteen large buttons, each running one command:
 
 | Button | Command |
 |---|---|
@@ -313,11 +368,15 @@ One panel with ten large buttons, each running one command:
 | Pressure Drop | `WENTAPRESSURE` |
 | Size Network | `WENTASIZE` |
 | Balance Dampers | `WENTABALANCE` |
+| Select Fan | `WENTAFAN` |
+| Insulate | `WENTAINSULATE` |
+| Room Sound | `WENTASOUND` |
+| Wenta Help | `WENTAHELP` |
 
-### 3.14 Roadmap
+### 3.18 Roadmap
 
-Commands such as `WENTASOUND`, `WENTAFAN`, `WENTAINSULATE`, `WENTAFITTING`,
-`WENTAREAD`/`WENTAWRITE` and `WENTAHELP` are planned, not implemented; the library half of several of them already exists (see §4).
+Commands such as `WENTAFITTING`, `WENTAATTEN` and `WENTAREAD`/`WENTAWRITE`
+are planned, not implemented; the library half of several of them already exists (see §4).
 The plan is in `zwcad-plugin/ROADMAP.md` and the GitHub issues of
 `ModelTok/wenta`.
 
@@ -540,7 +599,7 @@ totals; `Electrical.AsCsv` renders
 
 ## 5. Data files you can edit
 
-All three formats are UTF-8 JSON with an integer schema version; a reader
+All four formats are UTF-8 JSON with an integer schema version; a reader
 rejects a file declaring a newer version than it understands, and unknown
 keys are ignored. Numbers use a decimal point regardless of Windows locale.
 
@@ -632,6 +691,28 @@ of `wenta_class`/`from`/`to`.
 
 ---
 
+### 5.4 Fan catalog (`csharp/catalogs/example-fans.json`, version 1)
+
+```json
+{
+  "name": "example-fans",
+  "version": 1,
+  "description": "...",
+  "fans": [
+    { "id": "ExampleFan EF-160", "efficiency": 0.55, "source": "fictional example",
+      "points": [[0.0, 320.0], [0.1, 260.0], [0.2, 150.0], [0.3, 0.0]] }
+  ]
+}
+```
+
+Each fan has an `id` (unique in the file) and `points`, a list of
+`[flow_m3s, static_pa]` pairs with strictly increasing flows (at least two).
+`efficiency` (0 < η ≤ 1) is optional and only used for the power figure;
+`source` and `notes` are free text. Order matters: `WENTAFAN` selects the
+first fan that meets the duty point, so list fans from smallest to largest.
+Load with `FanCatalog.Load(path)`. The four fans in `example-fans.json` are
+invented and only exercise the format.
+
 ## 6. Troubleshooting
 
 Facts about the ZWCAD 2021 platform recorded in `zwcad-plugin/README.md`:
@@ -655,7 +736,8 @@ Facts about the ZWCAD 2021 platform recorded in `zwcad-plugin/README.md`:
 - **What did the plugin actually do?** Every command logs to
   `%TEMP%\wenta_zwcad_test.txt`; `WENTABOM` writes `%TEMP%\wenta_bom.csv`,
   `WENTATRACE` `wenta_trace.json`, `WENTAPRESSURE` `wenta_pressure.csv` and
-  `WENTABALANCE` `wenta_balance.csv`, all in `%TEMP%`.
+  `WENTABALANCE` `wenta_balance.csv` and `WENTASOUND` `wenta_sound.csv`,
+  all in `%TEMP%`.
 - **`open duct end(s) without a terminal flow`.** Every open end except the
   source needs a `WENTATAG` terminal marker within 150 mm; the message lists
   the positions.

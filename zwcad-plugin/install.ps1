@@ -4,8 +4,9 @@
 # elevated prompt:  powershell -ExecutionPolicy Bypass -File install.ps1
 #
 # What it does:
-#   1. copies WentaZwcad.dll (wenta C# core compiled in), Wenta.CUIX (ribbon)
-#      and example-generic.json (open zeta-catalog) -> C:\ProgramData\WentaZwcad\
+#   1. copies WentaZwcad.dll (wenta C# core compiled in), Wenta.CUIX (ribbon),
+#      example-generic.json (open zeta-catalog), example-fans.json (fan curves)
+#      and the EN/PL user guides -> C:\ProgramData\WentaZwcad\
 #   2. creates HKLM\SOFTWARE\ZWSOFT\ZWCAD\2021\en-US\Applications\WentaZwcad
 #      with LOADCTRLS=14 (startup + on-command + manual), MANAGED=1
 #
@@ -23,13 +24,15 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
     throw 'must run elevated (HKLM write required)'
 }
 
-foreach ($f in 'WentaZwcad.dll', 'Wenta.CUIX', 'example-generic.json') {
+$files = 'WentaZwcad.dll', 'Wenta.CUIX', 'example-generic.json', 'example-fans.json',
+    'user-guide.en.md', 'user-guide.pl.md'
+foreach ($f in $files) {
     $src = Join-Path $bin $f
     if (-not (Test-Path $src)) { throw "build output missing: $src (run build.cmd)" }
 }
 
 New-Item -ItemType Directory -Path $installDir -Force | Out-Null
-foreach ($f in 'WentaZwcad.dll', 'Wenta.CUIX', 'example-generic.json') {
+foreach ($f in $files) {
     Copy-Item (Join-Path $bin $f) (Join-Path $installDir $f) -Force
 }
 Write-Output ("installed: " + (Get-ChildItem $installDir | ForEach-Object { $_.Name }) -join ', ')

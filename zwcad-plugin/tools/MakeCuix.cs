@@ -300,6 +300,46 @@ namespace WentaZwcad.Tools
         <LargeImage Name=""wenta_panel_32.png"" />
       </Macro>
     </MenuMacro>
+    <MenuMacro UID=""WENTA_FAN"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_FAN_NM"">Select Fan</Name>
+        <Command>^C^C_.WENTAFAN</Command>
+        <HelpString xlate=""true"" UID=""WENTA_FAN_HS"">Pick a fan from a fan-curve catalog at the network duty point: WENTAFAN</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_panel_32.png"" />
+      </Macro>
+    </MenuMacro>
+    <MenuMacro UID=""WENTA_INSULATE"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_INSULATE_NM"">Insulate</Name>
+        <Command>^C^C_.WENTAINSULATE</Command>
+        <HelpString xlate=""true"" UID=""WENTA_INSULATE_HS"">EN ISO 12241 insulation thickness for round runs, annotated on WENTA-INSUL: WENTAINSULATE</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_duct_32.png"" />
+      </Macro>
+    </MenuMacro>
+    <MenuMacro UID=""WENTA_SOUND"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_SOUND_NM"">Room Sound</Name>
+        <Command>^C^C_.WENTASOUND</Command>
+        <HelpString xlate=""true"" UID=""WENTA_SOUND_HS"">Regenerated noise per room against the NC limit: WENTASOUND</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_panel_32.png"" />
+      </Macro>
+    </MenuMacro>
+    <MenuMacro UID=""WENTA_HELP"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_HELP_NM"">Wenta Help</Name>
+        <Command>^C^C_.WENTAHELP</Command>
+        <HelpString xlate=""true"" UID=""WENTA_HELP_HS"">Command list and the EN/PL user guide: WENTAHELP</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_info_32.png"" />
+      </Macro>
+    </MenuMacro>
   </MacroGroup>
 </MenuGroup>";
 
@@ -353,6 +393,22 @@ namespace WentaZwcad.Tools
         </RibbonCommandButton>
         <RibbonCommandButton UID=""WENTA_RBTN_BALANCE"" Id=""ZwRibbonCommandButton"" Text=""Balance Dampers"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_BALANCE"" KeyTip="""">
           <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_BALANCE_TT"">Balance Dampers</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_FAN"" Id=""ZwRibbonCommandButton"" Text=""Select Fan"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_FAN"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_FAN_TT"">Select Fan</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_INSULATE"" Id=""ZwRibbonCommandButton"" Text=""Insulate"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_INSULATE"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_INSULATE_TT"">Insulate</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_SOUND"" Id=""ZwRibbonCommandButton"" Text=""Room Sound"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_SOUND"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_SOUND_TT"">Room Sound</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_HELP"" Id=""ZwRibbonCommandButton"" Text=""Wenta Help"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_HELP"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_HELP_TT"">Wenta Help</TooltipTitle>
           <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
         </RibbonCommandButton>
       </RibbonRow>

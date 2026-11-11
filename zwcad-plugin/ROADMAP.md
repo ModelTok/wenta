@@ -118,20 +118,21 @@ Where Ventpack wins today; a full phase, not an afterthought:
 
 The modules `venti` proved out are all in C# now (library half done in
 #64); what remains per module is the plugin command
-(`WENTASOUND`, `WENTAFAN`, `WENTAINSULATE`, …; `WENTABALANCE` ships).
+(`WENTAATTEN`, room balance, …; `WENTABALANCE`, `WENTAFAN`, `WENTAINSULATE`
+and `WENTASOUND` ship).
 
 | former venti module | C# file | Library | Plugin command |
 |---|---|---|---|
 | `balancing` (damper ζ/open-%, branch surplus-Δ) | `Balancing.cs` | ✓ | `WENTABALANCE` ships (#49) |
 | `room` (balance/ACH, RoomBalanceSet + CSV) | `Room.cs` | ✓ | #26 |
-| `sound` (regenerated noise, room equation, NC) | `Sound.cs` | ✓ | #48 |
-| `fan` (curves, duty point, power) | `Fan.cs` | ✓ | #50 |
-| `insulation` (condensation / heat-loss thickness) | `Insulation.cs` | ✓ | #51 |
+| `sound` (regenerated noise, room equation, NC) | `Sound.cs` | ✓ | `WENTASOUND` ships; attenuator `WENTAATTEN` open (#48) |
+| `fan` (curves, duty point, power) | `Fan.cs` + `FanCatalog.cs` | ✓ | `WENTAFAN` ships (#50) |
+| `insulation` (condensation / heat-loss thickness) | `Insulation.cs` | ✓ | `WENTAINSULATE` ships, round runs (#51) |
 | `standards` (EN / ASHRAE / DIN tables) | `Standards.cs` | ✓ (#52) | — |
 | `analysis` / `marking` | `Analysis.cs` `Marking.cs` | ✓ | #59 |
 | `results` / `settings` / `electrical` | `Results.cs` `Settings.cs` `Electrical.cs` | ✓ | — |
 | `re` (Re/size ζ corrections) | `ReCorrections.cs` | ✓ | #21 |
-| `topology` (polylines → network, flatten) | `Topology.cs` | ✓ | #19 |
+| `topology` (polylines → network, flatten) | `Topology.cs` | ✓ | `WENTATRACE` ships (#19) |
 | `clash` (segment clearance) | `Clash.cs` | ✓ | #60 |
 | `fabrication` / `development` | `Fabrication.cs` `Development.cs` | ✓ | #29 |
 
@@ -153,9 +154,10 @@ The modules `venti` proved out are all in C# now (library half done in
 
 WiX MSI (DLL + CUIX + registry + example catalog), semver, CI on a
 Windows+ZWCAD2021 runner (evidence-log assert + screenshot diff), crash
-discipline (no unhandled exception in ZWCAD, `wenta.log`), `WENTAHELP`.
+discipline (no unhandled exception in ZWCAD, `wenta.log`), `WENTAHELP` ✓
+(command list; opens the Markdown guides, not HTML yet).
 Docs ✓: EN/PL user guide (`docs/user-guide.{en,pl}.md`), catalog spec, and
-the library CI (`.github/workflows/csharp.yml`) — #37 less `WENTAHELP`.
+the library CI (`.github/workflows/csharp.yml`) — #37 less HTML help.
 The MSI (#36) needs WiX, which is not installed on the current machine.
 
 ## Phase 7 — 3D, clash, IFC (full-suite scope)
@@ -165,7 +167,8 @@ drawing work, no engine half. Clash check ✓ (`Clash.cs`, segment clearance
 with CSV) and IFC4 export ✓ (`IfcExport.cs` — duct segments, fittings, air
 terminals, `Pset_Wenta`, deterministic GlobalIds; not yet opened in a
 viewer) are in the library; `WENTACLASH` and the export command are the
-remaining plugin work. After M3.
+remaining plugin work. Solids must use the insulated outer size where
+`WENTAINSULATE` has tagged a run (`insul_mm`). After M3.
 
 ---
 
