@@ -34,6 +34,14 @@ just test-all           # everything that runs without ZWCAD
 Run `just test-all` before you push; `.github/workflows/csharp.yml` runs the same suite on
 `windows-latest`.
 
+Agents and scripts run the tests from PowerShell (or `cmd`), not `just` from Git Bash, where
+the recipes' `cmd` calls do not run reliably:
+
+```powershell
+cmd /c csharp\build.cmd; .\csharp\bin\Wenta.Core.Tests.exe   # library build + test exe
+cmd /c zwcad-plugin\build.cmd                                 # plugin DLL + CUIX
+```
+
 ## Branches, commits and pull requests
 
 - Branch from `main`; land through a pull request, squash-merged.

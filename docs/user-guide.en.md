@@ -299,6 +299,12 @@ stays fully open. It then runs `WENTAFAN` (extra 150 Pa: `ExampleFan EF-160`
 at 0.12 m³/s and 160.7 Pa), `WENTAINSULATE` twice (20 mm mineral wool on
 every run, the second run updating the three labels), `WENTASOUND` and
 `WENTAHELP`. These are the values `Wenta.Core` computes for the layout.
+Finally it checks the round trip: `WENTAWRITE` draws the traced network at
+(0,−20000) (7 components), `WENTAREAD` reads it back (4.43 Pa, the
+`WENTATRACE` value), a second `WENTAWRITE` updates the 7 entities in place
+and the second `WENTAREAD` JSON is byte-identical to the first; with the
+point components erased `WENTAREAD` refuses with orphaned tags, and after
+lengthening one drawn duct by 1 m it reports one edit and 5.14 Pa.
 
 ### 3.13 `WENTAFAN` — fan at the duty point
 
@@ -352,9 +358,39 @@ English and Polish user guides, which `install.ps1` copies next to the DLL.
 The prompt `Open the user guide [English/Polski/No] <No>` opens the chosen
 guide (a Markdown file) with the program Windows associates with `.md`.
 
-### 3.17 Ribbon tab "Wenta"
+### 3.17 `WENTAWRITE` / `WENTAREAD` — network JSON ⇄ drawing
 
-One panel with fourteen large buttons, each running one command:
+**`WENTAWRITE`** prompts for a network JSON file (default
+`%TEMP%\wenta_read.json`; environment variables are expanded) and a base
+point (default 0,0) and draws the network to scale: every duct is a
+polyline on **`WENTA-DUCT`** with its length in millimetres, every other
+component (source, tee, fitting, damper, attenuator, terminal) a 100 mm
+circle on the same layer, and a label on **`WENTA-ANNO`**. Each entity
+carries the full component record in its XData tag: `cid`, `type`, GUID,
+name, `scope`, catalog entry and provenance, the section (with the exact
+metres), the parameters (length, roughness, flow, ζ …) and its upstream
+connections (`in.<port>` = `component:port`). When the JSON holds a
+`layout_mm` / `at_mm` for every component (as `WENTAREAD` writes it) that
+layout is used; otherwise the network is laid out from each source, ducts
+along the current direction and the branch of each tee turned 90°. Running
+`WENTAWRITE` again updates the existing entities in place (matched by GUID,
+then by scope and id) instead of drawing a second copy.
+
+**`WENTAREAD`** reads every tagged entity in model space back into a
+network, checks it and writes the JSON in the design shape that the
+retired Python `NetworkDesignSchema` also accepts (prompt for the path,
+default `%TEMP%\wenta_read.json`), then solves it and prints ΔP. A duct
+whose drawn length differs from its tag by more than 0.5 mm takes the
+drawn length, and its tag and label are updated. The command **refuses**
+(nothing is written) when the drawing has an orphaned tag (a component fed
+by one that is no longer in the drawing), a missing or duplicated GUID (a
+copied entity), a duplicated id, a class that does not match the type, a
+duct record on a point entity or the reverse, a missing value, an unknown
+port, or a network that does not validate. Up to 20 problems are listed.
+
+### 3.18 Ribbon tab "Wenta"
+
+One panel with sixteen large buttons, each running one command:
 
 | Button | Command |
 |---|---|
@@ -371,11 +407,13 @@ One panel with fourteen large buttons, each running one command:
 | Select Fan | `WENTAFAN` |
 | Insulate | `WENTAINSULATE` |
 | Room Sound | `WENTASOUND` |
+| Draw Network | `WENTAWRITE` |
+| Read Network | `WENTAREAD` |
 | Wenta Help | `WENTAHELP` |
 
-### 3.18 Roadmap
+### 3.19 Roadmap
 
-Commands such as `WENTAFITTING`, `WENTAATTEN` and `WENTAREAD`/`WENTAWRITE`
+Commands such as `WENTAFITTING` and `WENTAATTEN`
 are planned, not implemented; the library half of several of them already exists (see §4).
 The plan is in `zwcad-plugin/ROADMAP.md` and the GitHub issues of
 `ModelTok/wenta`.
@@ -688,6 +726,14 @@ Rectangular sections are `{ "shape": "rectangular", "width": w, "height": h }`.
 Geometry in metres, flows in m³/s. Optional constructor arguments may be
 omitted. On input, `type`/`source`/`target` are accepted as legacy aliases
 of `wenta_class`/`from`/`to`.
+
+`NetworkJson.SerializeDesign` (used by `WENTAREAD`) writes the same network
+in the design shape: `components` is an object keyed by id, each with
+`type` first, and connections are `{ "source": "ahu:outlet", "target":
+"duct:inlet" }`. `Parse` reads both shapes. Optional keys, written only when
+set: `catalog_entry`, `provenance`, `role` (for a `TwoPortFitting`:
+`damper`, `attenuator`, …), `layout_mm` (duct centreline `[[x, y], …]` in
+drawing millimetres) and `at_mm` (`[x, y]` of a point component).
 
 ---
 

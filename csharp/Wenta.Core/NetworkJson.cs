@@ -12,6 +12,14 @@ namespace Wenta
         public string Guid;
 
         public string DrawingScope;
+
+        // Optional identity and drawing data (#20, #22). They are written
+        // only when set, so a network without them serialises unchanged.
+        public string CatalogEntry;
+        public string Provenance;
+        public string Role;                 // "damper", "attenuator", ... on a TwoPortFitting
+        public List<Point2> LayoutMm;       // duct centreline in drawing units
+        public Point2? AtMm;                // insertion point of a point component
     }
 
     public static class NetworkJson
@@ -21,6 +29,21 @@ namespace Wenta
 
         public static string Serialize(Network net, IDictionary<string, ComponentMeta> meta = null)
         {
+            return Write(net, meta, false);
+        }
+
+        // The python/wenta NetworkDesignSchema shape: components keyed by id
+        // with a "type" discriminator, connections as source/target
+        // "component:port". The extra keys (guid, drawing_scope, layout_mm,
+        // ...) are ignored by pydantic's default model config. Parse reads
+        // both shapes.
+        public static string SerializeDesign(Network net, IDictionary<string, ComponentMeta> meta = null)
+        {
+            return Write(net, meta, true);
+        }
+
+        private static string Write(Network net, IDictionary<string, ComponentMeta> meta, bool design)
+        {
             if (net == null)
                 throw new WentaException("NetworkJson.Serialize: network is null");
 
@@ -28,8 +51,9 @@ namespace Wenta
             root["schema_version"] = SchemaVersion;
             root["name"] = net.Name ?? "";
             var components = new ArrayList();
+            var byId = new Dictionary<string, object>();
             var connections = new ArrayList();
-            root["components"] = components;
+            root["components"] = design ? (object)byId : components;
             root["connections"] = connections;
 
             bool writeBack = meta != null && !meta.IsReadOnly;
@@ -48,7 +72,16 @@ namespace Wenta
                 if (string.IsNullOrEmpty(m.Guid))
                     m.Guid = System.Guid.NewGuid().ToString("D");
 
-                components.Add(ComponentToDict(cid, c, m));
+                Dictionary<string, object> cd = ComponentToDict(cid, c, m);
+                if (design)
+                {
+                    var typed = new Dictionary<string, object>();
+                    typed["type"] = WentaClassOf(c);
+                    foreach (KeyValuePair<string, object> e in cd)
+                        if (e.Key != "id" && e.Key != "wenta_class") typed[e.Key] = e.Value;
+                    byId[cid] = typed;
+                }
+                else components.Add(cd);
 
                 foreach (Port p in c.Ports)
                 {
@@ -58,8 +91,16 @@ namespace Wenta
                         int colon = pred.LastIndexOf(':');
                         if (colon < 0) continue;
                         var e = new Dictionary<string, object>();
-                        e["from"] = pred.Substring(0, colon) + "." + pred.Substring(colon + 1);
-                        e["to"] = cid + "." + p.Name;
+                        if (design)
+                        {
+                            e["source"] = pred;
+                            e["target"] = Network.PortNodeId(cid, p.Name);
+                        }
+                        else
+                        {
+                            e["from"] = pred.Substring(0, colon) + "." + pred.Substring(colon + 1);
+                            e["to"] = cid + "." + p.Name;
+                        }
                         connections.Add(e);
                     }
                 }
@@ -106,7 +147,24 @@ namespace Wenta
                     + SchemaVersion.ToString(CultureInfo.InvariantCulture) + " or older");
 
             object compsObj;
-            if (!root.TryGetValue("components", out compsObj) || !(compsObj is ArrayList))
+            root.TryGetValue("components", out compsObj);
+            var keyed = compsObj as Dictionary<string, object>;
+            if (keyed != null)
+            {
+                // NetworkDesignSchema shape: {"<id>": {...}, ...}
+                var list = new ArrayList();
+                foreach (KeyValuePair<string, object> kv in keyed)
+                {
+                    var cd = kv.Value as Dictionary<string, object>;
+                    if (cd == null)
+                        throw new WentaException("network JSON: component '" + kv.Key + "' is not an object");
+                    var copy = new Dictionary<string, object>(cd);
+                    copy["id"] = kv.Key;
+                    list.Add(copy);
+                }
+                compsObj = list;
+            }
+            if (!(compsObj is ArrayList))
                 throw new WentaException("network JSON has no 'components' array");
 
             var net = new Network();
@@ -136,6 +194,17 @@ namespace Wenta
                 var m = new ComponentMeta();
                 m.Guid = Str(d, "guid", ctx);
                 m.DrawingScope = Str(d, "drawing_scope", ctx);
+                m.CatalogEntry = Str(d, "catalog_entry", ctx);
+                m.Provenance = Str(d, "provenance", ctx);
+                m.Role = Str(d, "role", ctx);
+                m.LayoutMm = ParsePoints(d, "layout_mm", ctx);
+                List<Point2> atPts = ParsePoints(d, "at_mm", ctx);
+                if (atPts != null)
+                {
+                    if (atPts.Count != 1)
+                        throw new WentaException("network JSON: " + ctx + ": 'at_mm' must be one [x, y] point");
+                    m.AtMm = atPts[0];
+                }
                 meta[cid] = m;
                 index++;
             }
@@ -198,6 +267,11 @@ namespace Wenta
             d["wenta_class"] = WentaClassOf(c);
             d["guid"] = m.Guid;
             d["drawing_scope"] = m.DrawingScope;
+            if (m.CatalogEntry != null) d["catalog_entry"] = m.CatalogEntry;
+            if (m.Provenance != null) d["provenance"] = m.Provenance;
+            if (m.Role != null) d["role"] = m.Role;
+            if (m.LayoutMm != null) d["layout_mm"] = PointsToList(m.LayoutMm);
+            if (m.AtMm.HasValue) d["at_mm"] = new ArrayList { m.AtMm.Value.X, m.AtMm.Value.Y };
             d["name"] = c.Name;
 
             var rd = c as RigidDuct;
@@ -332,6 +406,37 @@ namespace Wenta
                 + ": 'shape' must be 'round' or 'rectangular', got '" + (shape ?? "null") + "'");
         }
 
+
+        private static ArrayList PointsToList(List<Point2> pts)
+        {
+            var list = new ArrayList();
+            foreach (Point2 p in pts) list.Add(new ArrayList { p.X, p.Y });
+            return list;
+        }
+
+        // "layout_mm": [[x, y], ...]; "at_mm": [x, y].
+        private static List<Point2> ParsePoints(Dictionary<string, object> d, string key, string ctx)
+        {
+            object v;
+            if (!d.TryGetValue(key, out v) || v == null) return null;
+            var arr = v as ArrayList;
+            if (arr == null)
+                throw new WentaException("network JSON: " + ctx + ": '" + key + "' must be an array");
+            var pts = new List<Point2>();
+            if (arr.Count == 2 && IsNumber(arr[0]) && IsNumber(arr[1]))
+            {
+                pts.Add(new Point2(ToDouble(arr[0]), ToDouble(arr[1])));
+                return pts;
+            }
+            foreach (object o in arr)
+            {
+                var xy = o as ArrayList;
+                if (xy == null || xy.Count != 2 || !IsNumber(xy[0]) || !IsNumber(xy[1]))
+                    throw new WentaException("network JSON: " + ctx + ": '" + key + "' must hold [x, y] pairs");
+                pts.Add(new Point2(ToDouble(xy[0]), ToDouble(xy[1])));
+            }
+            return pts;
+        }
 
         private static string Endpoint(string s)
         {

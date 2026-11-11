@@ -66,48 +66,13 @@ namespace WentaZwcad
                     }
                     else
                     {
+                        // Closed outlines (such as the WENTADUCT cross-section) are
+                        // not centrelines.
+                        var closed = e as ZwSoft.ZwCAD.DatabaseServices.Polyline;
+                        if (closed != null && closed.Closed) { sel.Skipped++; continue; }
                         var d = new DrawnDuct { Handle = h, Section = tag != null ? tag.Section() : null };
-                        var line = e as Line;
-                        var pl = e as ZwSoft.ZwCAD.DatabaseServices.Polyline;
-                        var arc = e as Arc;
-                        if (line != null)
-                        {
-                            d.PointsMm.Add(new Wenta.Point2(line.StartPoint.X, line.StartPoint.Y));
-                            d.PointsMm.Add(new Wenta.Point2(line.EndPoint.X, line.EndPoint.Y));
-                        }
-                        else if (pl != null)
-                        {
-                            // Closed outlines (such as the WENTADUCT cross-section) are
-                            // not centrelines.
-                            if (pl.Closed) { sel.Skipped++; continue; }
-                            for (int i = 0; i < pl.NumberOfVertices; i++)
-                            {
-                                Point2d p = pl.GetPoint2dAt(i);
-                                d.PointsMm.Add(new Wenta.Point2(p.X, p.Y));
-                                if (i + 1 < pl.NumberOfVertices && Math.Abs(pl.GetBulgeAt(i)) > 1e-12)
-                                {
-                                    double sweep = 4.0 * Math.Atan(Math.Abs(pl.GetBulgeAt(i)));
-                                    int n = ArcSteps(sweep);
-                                    for (int k = 1; k < n; k++)
-                                    {
-                                        Point3d q = pl.GetPointAtParameter(i + (double)k / n);
-                                        d.PointsMm.Add(new Wenta.Point2(q.X, q.Y));
-                                    }
-                                }
-                            }
-                        }
-                        else if (arc != null)
-                        {
-                            double sweep = arc.EndAngle - arc.StartAngle;
-                            if (sweep <= 0.0) sweep += 2.0 * Math.PI;
-                            int n = ArcSteps(sweep);
-                            for (int k = 0; k <= n; k++)
-                            {
-                                double a = arc.StartAngle + sweep * k / n;
-                                d.PointsMm.Add(new Wenta.Point2(arc.Center.X + arc.Radius * Math.Cos(a),
-                                    arc.Center.Y + arc.Radius * Math.Sin(a)));
-                            }
-                        }
+                        List<Wenta.Point2> pts = Vertices(e);
+                        if (pts != null) d.PointsMm.AddRange(pts);
                         if (d.PointsMm.Count < 2) { sel.Skipped++; continue; }
                         sel.Ducts.Add(d);
                     }
@@ -117,6 +82,53 @@ namespace WentaZwcad
                 tr.Commit();
             }
             return sel;
+        }
+
+        // Centreline vertices of a LINE, LWPOLYLINE or ARC in drawing units;
+        // null for any other entity.
+        internal static List<Wenta.Point2> Vertices(Entity e)
+        {
+            var pts = new List<Wenta.Point2>();
+            var line = e as Line;
+            var pl = e as ZwSoft.ZwCAD.DatabaseServices.Polyline;
+            var arc = e as Arc;
+            if (line != null)
+            {
+                pts.Add(new Wenta.Point2(line.StartPoint.X, line.StartPoint.Y));
+                pts.Add(new Wenta.Point2(line.EndPoint.X, line.EndPoint.Y));
+            }
+            else if (pl != null)
+            {
+                for (int i = 0; i < pl.NumberOfVertices; i++)
+                {
+                    Point2d p = pl.GetPoint2dAt(i);
+                    pts.Add(new Wenta.Point2(p.X, p.Y));
+                    if (i + 1 < pl.NumberOfVertices && Math.Abs(pl.GetBulgeAt(i)) > 1e-12)
+                    {
+                        double sweep = 4.0 * Math.Atan(Math.Abs(pl.GetBulgeAt(i)));
+                        int n = ArcSteps(sweep);
+                        for (int k = 1; k < n; k++)
+                        {
+                            Point3d q = pl.GetPointAtParameter(i + (double)k / n);
+                            pts.Add(new Wenta.Point2(q.X, q.Y));
+                        }
+                    }
+                }
+            }
+            else if (arc != null)
+            {
+                double sweep = arc.EndAngle - arc.StartAngle;
+                if (sweep <= 0.0) sweep += 2.0 * Math.PI;
+                int n = ArcSteps(sweep);
+                for (int k = 0; k <= n; k++)
+                {
+                    double a = arc.StartAngle + sweep * k / n;
+                    pts.Add(new Wenta.Point2(arc.Center.X + arc.Radius * Math.Cos(a),
+                        arc.Center.Y + arc.Radius * Math.Sin(a)));
+                }
+            }
+            else return null;
+            return pts;
         }
 
         // Arcs and polyline bulges are followed as chords of at most 5°, so

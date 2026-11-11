@@ -330,6 +330,26 @@ namespace WentaZwcad.Tools
         <LargeImage Name=""wenta_panel_32.png"" />
       </Macro>
     </MenuMacro>
+    <MenuMacro UID=""WENTA_WRITE"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_WRITE_NM"">Draw Network</Name>
+        <Command>^C^C_.WENTAWRITE</Command>
+        <HelpString xlate=""true"" UID=""WENTA_WRITE_HS"">Draw a network JSON to scale on WENTA-DUCT, updating earlier drawings in place: WENTAWRITE</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_duct_32.png"" />
+      </Macro>
+    </MenuMacro>
+    <MenuMacro UID=""WENTA_READ"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_READ_NM"">Read Network</Name>
+        <Command>^C^C_.WENTAREAD</Command>
+        <HelpString xlate=""true"" UID=""WENTA_READ_HS"">Read the drawn network back to JSON, refusing orphaned or inconsistent tags: WENTAREAD</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_info_32.png"" />
+      </Macro>
+    </MenuMacro>
     <MenuMacro UID=""WENTA_HELP"">
       <Macro type=""Any"">
         <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
@@ -405,6 +425,14 @@ namespace WentaZwcad.Tools
         </RibbonCommandButton>
         <RibbonCommandButton UID=""WENTA_RBTN_SOUND"" Id=""ZwRibbonCommandButton"" Text=""Room Sound"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_SOUND"" KeyTip="""">
           <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_SOUND_TT"">Room Sound</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_WRITE"" Id=""ZwRibbonCommandButton"" Text=""Draw Network"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_WRITE"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_WRITE_TT"">Draw Network</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_READ"" Id=""ZwRibbonCommandButton"" Text=""Read Network"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_READ"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_READ_TT"">Read Network</TooltipTitle>
           <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
         </RibbonCommandButton>
         <RibbonCommandButton UID=""WENTA_RBTN_HELP"" Id=""ZwRibbonCommandButton"" Text=""Wenta Help"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_HELP"" KeyTip="""">

@@ -321,6 +321,13 @@ i jego przepustnica pozostaje całkowicie otwarta. Następnie skrypt uruchamia
 i 160,7 Pa), dwukrotnie `WENTAINSULATE` (20 mm wełny mineralnej na każdym
 odcinku; drugie uruchomienie aktualizuje trzy etykiety), `WENTASOUND`
 i `WENTAHELP`. Są to wartości, które `Wenta.Core` oblicza dla tego układu.
+Na koniec sprawdzana jest wymiana w obie strony: `WENTAWRITE` rysuje
+odczytaną sieć w (0,−20000) (7 elementów), `WENTAREAD` odczytuje ją
+z powrotem (4,43 Pa, wartość z `WENTATRACE`), drugie `WENTAWRITE`
+aktualizuje 7 obiektów w miejscu, a JSON z drugiego `WENTAREAD` jest
+identyczny bajt w bajt z pierwszym; po usunięciu elementów punktowych
+`WENTAREAD` odmawia z powodu osieroconych znaczników, a po wydłużeniu
+jednego narysowanego przewodu o 1 m zgłasza jedną zmianę i 5,14 Pa.
 
 ### 3.13 `WENTAFAN` — wentylator w punkcie pracy
 
@@ -377,9 +384,41 @@ podręcznika angielskiego i polskiego, które `install.ps1` kopiuje obok DLL.
 Zapytanie `Open the user guide [English/Polski/No] <No>` otwiera wybrany
 podręcznik (plik Markdown) programem, który Windows kojarzy z `.md`.
 
-### 3.17 Karta wstęgi „Wenta”
+### 3.17 `WENTAWRITE` / `WENTAREAD` — sieć JSON ⇄ rysunek
 
-Jeden panel z czternastoma dużymi przyciskami, każdy uruchamia jedno polecenie:
+**`WENTAWRITE`** pyta o plik JSON sieci (domyślnie
+`%TEMP%\wenta_read.json`; zmienne środowiskowe są rozwijane) i punkt
+bazowy (domyślnie 0,0) i rysuje sieć w skali: każdy przewód to polilinia
+na warstwie **`WENTA-DUCT`** o długości w milimetrach, każdy inny element
+(źródło, trójnik, kształtka, przepustnica, tłumik, terminal) to okrąg
+100 mm na tej samej warstwie, a etykieta trafia na **`WENTA-ANNO`**. Każdy
+obiekt ma w znaczniku XData pełny rekord elementu: `cid`, `type`, GUID,
+nazwę, `scope`, pozycję katalogową i pochodzenie, przekrój (z dokładnymi
+metrami), parametry (długość, chropowatość, strumień, ζ …) oraz połączenia
+od strony dopływu (`in.<port>` = `element:port`). Jeżeli JSON zawiera
+`layout_mm` / `at_mm` dla każdego elementu (tak zapisuje go `WENTAREAD`),
+używany jest ten układ; w przeciwnym razie sieć jest rozkładana od każdego
+źródła: przewody w bieżącym kierunku, odgałęzienie każdego trójnika
+obrócone o 90°. Ponowne `WENTAWRITE` aktualizuje istniejące obiekty
+w miejscu (dopasowane po GUID, potem po zakresie i id) zamiast rysować
+drugą kopię.
+
+**`WENTAREAD`** odczytuje wszystkie oznaczone obiekty z obszaru modelu
+z powrotem do sieci, sprawdza ją i zapisuje JSON w postaci projektowej,
+którą przyjmuje też wycofany pythonowy `NetworkDesignSchema` (pytanie
+o ścieżkę, domyślnie `%TEMP%\wenta_read.json`), po czym ją oblicza
+i wypisuje ΔP. Przewód, którego narysowana długość różni się od znacznika
+o więcej niż 0,5 mm, przyjmuje długość z rysunku, a jego znacznik
+i etykieta są aktualizowane. Polecenie **odmawia** (nic nie zapisuje), gdy
+w rysunku jest osierocony znacznik (element zasilany przez element, którego
+już nie ma w rysunku), brakujący lub powielony GUID (skopiowany obiekt),
+powielone id, klasa niezgodna z typem, rekord przewodu na obiekcie
+punktowym lub odwrotnie, brakująca wartość, nieznany port albo sieć, która
+nie przechodzi walidacji. Wypisywanych jest do 20 problemów.
+
+### 3.18 Karta wstęgi „Wenta”
+
+Jeden panel z szesnastoma dużymi przyciskami, każdy uruchamia jedno polecenie:
 
 | Przycisk | Polecenie |
 |---|---|
@@ -396,11 +435,13 @@ Jeden panel z czternastoma dużymi przyciskami, każdy uruchamia jedno polecenie
 | Select Fan | `WENTAFAN` |
 | Insulate | `WENTAINSULATE` |
 | Room Sound | `WENTASOUND` |
+| Draw Network | `WENTAWRITE` |
+| Read Network | `WENTAREAD` |
 | Wenta Help | `WENTAHELP` |
 
-### 3.18 Plan rozwoju
+### 3.19 Plan rozwoju
 
-Polecenia takie jak `WENTAFITTING`, `WENTAATTEN` i `WENTAREAD`/`WENTAWRITE`
+Polecenia takie jak `WENTAFITTING` i `WENTAATTEN`
 są planowane, nie zaimplementowane; część biblioteczna kilku z nich już istnieje (patrz §4).
 Plan znajduje się w `zwcad-plugin/ROADMAP.md` oraz w zgłoszeniach GitHub
 repozytorium `ModelTok/wenta`.
@@ -737,6 +778,15 @@ Przekroje prostokątne: `{ "shape": "rectangular", "width": w, "height": h }`.
 Geometria w metrach, strumienie w m³/s. Opcjonalne argumenty konstruktora
 można pominąć. Przy odczycie `type`/`source`/`target` są akceptowane jako
 starsze aliasy `wenta_class`/`from`/`to`.
+
+`NetworkJson.SerializeDesign` (używany przez `WENTAREAD`) zapisuje tę samą
+sieć w postaci projektowej: `components` to obiekt kluczowany id, każdy
+z `type` na początku, a połączenia mają postać `{ "source": "ahu:outlet",
+"target": "duct:inlet" }`. `Parse` czyta obie postacie. Klucze opcjonalne,
+zapisywane tylko gdy są ustawione: `catalog_entry`, `provenance`, `role`
+(dla `TwoPortFitting`: `damper`, `attenuator`, …), `layout_mm` (oś
+przewodu `[[x, y], …]` w milimetrach rysunku) i `at_mm` (`[x, y]` elementu
+punktowego).
 
 ---
 

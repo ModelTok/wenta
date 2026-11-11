@@ -62,7 +62,7 @@ See `csharp/README.md` for the test methodology and `zwcad-plugin/README.md`
 for the plugin commands (`WENTADUCT`, `WENTACATALOG`, `WENTABOM`,
 `WENTAPANEL`, `WENTAHELLO`, `WENTATAG`, `WENTATRACE`, `WENTAPRESSURE`,
 `WENTASIZE`, `WENTABALANCE`, `WENTAFAN`, `WENTAINSULATE`, `WENTASOUND`,
-`WENTAHELP`) and ZWCAD platform notes.
+`WENTAWRITE`, `WENTAREAD`, `WENTAHELP`) and ZWCAD platform notes.
 
 ## Roadmap
 

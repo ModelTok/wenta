@@ -41,6 +41,7 @@ if not exist "%OUT%" mkdir "%OUT%"
   "%SRC%\CadIo.cs" ^
   "%SRC%\NetworkCommands.cs" ^
   "%SRC%\DesignCommands.cs" ^
+  "%SRC%\RoundTripCommands.cs" ^
   "%CORE%\Units.cs" ^
   "%CORE%\Fluid.cs" ^
   "%CORE%\Geometry.cs" ^
@@ -80,7 +81,8 @@ if not exist "%OUT%" mkdir "%OUT%"
   "%CORE%\ReFit.cs" ^
   "%CORE%\QuickConnect.cs" ^
   "%CORE%\DrawingModel.cs" ^
-  "%CORE%\FanCatalog.cs"
+  "%CORE%\FanCatalog.cs" ^
+  "%CORE%\NetworkDrawing.cs"
 
 if errorlevel 1 ( echo BUILD FAILED & exit /b 1 )
 
