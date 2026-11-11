@@ -87,7 +87,7 @@ on the build machine.
 | `WENTADUCT` sizing + label + XData design record | `Sizing` ✓ | ships |
 | `WENTASIZE` batch over a selection set | `BatchSizing` ✓ (5 methods, EN/ASHRAE/DIN snap, per-request errors) | ships (#24) |
 | `WENTAPRESSURE` critical-path ΔP | `PressureReport` ✓ (per-port rows, cumulative, share) | ships (#47) |
-| `WENTAREAD` / `WENTAWRITE` JSON round-trip | `NetworkJson` ✓ (schema_version 1, GUID + `wenta_class` + `drawing_scope`) | #20, #22 |
+| `WENTAREAD` / `WENTAWRITE` JSON round-trip | `NetworkJson` + `NetworkDrawing` ✓ (design shape, layout, orphaned-tag refusal) | ships (#20, #22) |
 | `WENTATRACE` polylines → network | `Topology.Trace` + `DrawingTrace` ✓ (tee detection, markers, flatten) | ships (#19) |
 | `WENTATAG` terminal/source/damper markers | `WentaTag` ✓ (v2 XData: class, GUID, key/value) | ships (#22 in part) |
 | `WENTAFITTING` blocks → ζ | `Catalog` + `ReCorrections` ✓ | #21 |

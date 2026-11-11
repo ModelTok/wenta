@@ -92,3 +92,26 @@ office
 0.2
 _.WENTAHELP
 No
+_.WENTAWRITE
+%TEMP%\wenta_trace.json
+0,-20000
+_.WENTAREAD
+
+_.WENTAWRITE
+
+
+_.WENTAREAD
+%TEMP%\wenta_read2.json
+(setq wss (ssget "_X" '((0 . "CIRCLE") (8 . "WENTA-DUCT"))))
+_.ERASE
+!wss
+
+_.WENTAREAD
+_.OOPS
+(setq we (ssname (ssget "_X" '((0 . "LWPOLYLINE") (8 . "WENTA-DUCT"))) 0) wd (entget we) wv (assoc 10 (reverse wd)) wd (subst (list 10 (+ (cadr wv) 1000.0) (caddr wv)) wv wd))
+(entmod wd)
+_.WENTAREAD
+%TEMP%\wenta_read3.json
+_.WENTAWRITE
+%TEMP%\wenta_read3.json
+

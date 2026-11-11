@@ -299,6 +299,8 @@ namespace WentaZwcad
             new[] { "WENTAFAN", "pick a fan from a fan-curve catalog at the duty point" },
             new[] { "WENTAINSULATE", "EN ISO 12241 insulation thickness for round runs" },
             new[] { "WENTASOUND", "regenerated noise per room against the NC limit" },
+            new[] { "WENTAWRITE", "draw a network JSON to scale, re-writes update in place" },
+            new[] { "WENTAREAD", "read the drawn network back to JSON, refusing bad tags" },
             new[] { "WENTAHELLO", "version banner" },
             new[] { "WENTAHELP", "this list and the user guide" },
         };

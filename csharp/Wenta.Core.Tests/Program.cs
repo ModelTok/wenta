@@ -59,6 +59,7 @@ namespace Wenta.Core.Tests
             RunDrawing();
             RunFanCatalog(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "catalogs"));
             RunDrawingInsulation();
+            RunNetworkDrawing();
             RunPerformance();
 
             Console.WriteLine();
@@ -2622,6 +2623,221 @@ namespace Wenta.Core.Tests
         }
 
         // WENTAINSULATE: DrawingInsulation is Insulation + SelectThickness for a round run.
+        // ---- NetworkDrawing: WENTAWRITE / WENTAREAD round trip (#20, #22) ----
+
+        // What ZWCAD stores: the tag goes through XData strings and back.
+        private static List<DrawnComponent> AsDrawn(List<DrawnComponent> written)
+        {
+            var list = new List<DrawnComponent>();
+            int h = 1;
+            foreach (DrawnComponent d in written)
+            {
+                var xd = new List<KeyValuePair<int, object>> { new KeyValuePair<int, object>(1001, WentaTag.AppName) };
+                xd.AddRange(d.Tag.ToXData());
+                list.Add(new DrawnComponent
+                {
+                    Handle = "H" + (h++).ToString(C),
+                    Tag = WentaTag.FromXData(xd),
+                    PointsMm = d.PointsMm == null ? null : new List<Point2>(d.PointsMm),
+                    AtMm = d.AtMm,
+                });
+            }
+            return list;
+        }
+
+        private static DrawnComponent ByCid(List<DrawnComponent> list, string cid)
+        {
+            foreach (DrawnComponent d in list) if (d.Tag.Get("cid") == cid) return d;
+            return null;
+        }
+
+        private static bool HasError(NetworkReadResult r, string fragment)
+        {
+            foreach (string e in r.Errors) if (e.Contains(fragment)) return true;
+            return false;
+        }
+
+        private static string TagText(WentaTag t)
+        {
+            var parts = new List<string>();
+            foreach (KeyValuePair<int, object> kv in t.ToXData()) parts.Add(Convert.ToString(kv.Value, C));
+            return string.Join("|", parts.ToArray());
+        }
+
+        private static void RunNetworkDrawing()
+        {
+            Network net = TeeNetwork();
+            var meta = new Dictionary<string, ComponentMeta>();
+            var warnings = new List<string>();
+            List<DrawnComponent> written = NetworkDrawing.Write(net, meta, new Point2(1000.0, 2000.0), warnings);
+            CheckInt("ndraw.write_count", written.Count, 7);
+            CheckInt("ndraw.write_no_warnings", warnings.Count, 0);
+            CheckStr("ndraw.class_tee", ByCid(written, "tee").Tag.Class, NetworkDrawing.ClassTee);
+            CheckStr("ndraw.class_flex", ByCid(written, "flex").Tag.Class, NetworkDrawing.ClassFlex);
+            CheckStr("ndraw.class_duct", ByCid(written, "duct").Tag.Class, WentaTag.ClassDuct);
+            CheckStr("ndraw.connection_key", ByCid(written, "flex").Tag.Get("in.inlet"), "tee:branch");
+
+            // To scale: 20 m of duct is 20 000 drawing units, the tee sits at
+            // its end, the straight leg carries on and the branch turns 90°.
+            DrawnComponent duct = ByCid(written, "duct");
+            Check("ndraw.duct_to_scale", NetworkDrawing.PolylineLengthMm(duct.PointsMm), 20000.0, 1e-12);
+            Check("ndraw.source_at_origin_x", ByCid(written, "ahu").AtMm.Value.X, 1000.0, 1e-12);
+            Check("ndraw.tee_at_duct_end", ByCid(written, "tee").AtMm.Value.X, 21000.0, 1e-12);
+            Point2[] d2 = ByCid(written, "d2").PointsMm.ToArray();
+            Check("ndraw.straight_keeps_direction", d2[1].X - d2[0].X, 5000.0, 1e-12);
+            Point2[] fl = ByCid(written, "flex").PointsMm.ToArray();
+            Check("ndraw.branch_turns_x", fl[1].X - fl[0].X, 0.0, 1e-12);
+            Check("ndraw.branch_turns_y", Math.Abs(fl[1].Y - fl[0].Y), 3000.0, 1e-12);
+            Check("ndraw.terminal_at_branch_end", ByCid(written, "t2").AtMm.Value.Y, fl[1].Y, 1e-12);
+
+            // Read back what the drawing stores: same network, same JSON.
+            List<DrawnComponent> drawn = AsDrawn(written);
+            NetworkReadResult back = NetworkDrawing.Read(drawn, "tee");
+            CheckTrue("ndraw.read_ok", back.Ok);
+            CheckInt("ndraw.read_count", back.Network.Components.Count, 7);
+            CheckInt("ndraw.read_no_length_edits", back.LengthUpdated.Count, 0);
+            Check("ndraw.read_dp", back.Network.Solve(), 7.629497821799035, 1e-12);
+            string jsonA = NetworkJson.SerializeDesign(net, meta);
+            string jsonB = NetworkJson.SerializeDesign(back.Network, back.Meta);
+            CheckStr("ndraw.lossless_json", jsonB, jsonA);
+            CheckStr("ndraw.guid_kept", back.Meta["d2"].Guid, meta["d2"].Guid);
+
+            // Write the read result again: the stored layout is reused and
+            // every tag comes out identical, so a re-write updates in place.
+            var warnings2 = new List<string>();
+            List<DrawnComponent> again = NetworkDrawing.Write(back.Network, back.Meta, new Point2(-5e5, -5e5), warnings2);
+            CheckInt("ndraw.rewrite_no_warnings", warnings2.Count, 0);
+            bool same = again.Count == written.Count;
+            for (int i = 0; same && i < again.Count; i++)
+                same = TagText(again[i].Tag) == TagText(written[i].Tag);
+            CheckTrue("ndraw.rewrite_tags_identical", same);
+            Check("ndraw.rewrite_layout_kept", ByCid(again, "tee").AtMm.Value.X, 21000.0, 1e-12);
+            NetworkReadResult back2 = NetworkDrawing.Read(AsDrawn(again), "tee");
+            CheckStr("ndraw.second_round_trip", NetworkJson.SerializeDesign(back2.Network, back2.Meta), jsonA);
+
+            // The design JSON is the python/wenta NetworkDesignSchema shape
+            // and parses back with its layout.
+            CheckTrue("ndraw.design_keyed_components", jsonA.Contains("\"components\":{\"ahu\":{\"type\":\"Source\""));
+            CheckTrue("ndraw.design_connection", jsonA.Contains("{\"source\":\"tee:branch\",\"target\":\"flex:inlet\"}"));
+            Dictionary<string, ComponentMeta> pmeta;
+            Network parsed = NetworkJson.Parse(jsonA, out pmeta);
+            Check("ndraw.design_parse_dp", parsed.Solve(), 7.629497821799035, 1e-12);
+            Check("ndraw.design_parse_layout", pmeta["tee"].AtMm.Value.X, 21000.0, 1e-12);
+            CheckStr("ndraw.design_reserialize", NetworkJson.SerializeDesign(parsed, pmeta), jsonA);
+            CheckStr("ndraw.legacy_shape_unchanged", NetworkJson.Serialize(TeeNetwork(),
+                new Dictionary<string, ComponentMeta> { { "duct", new ComponentMeta { Guid = "g" } } }).Contains("layout_mm") ? "layout" : "none", "none");
+
+            // Editing the geometry updates the record instead of adding one.
+            List<DrawnComponent> edited = AsDrawn(written);
+            DrawnComponent ed = ByCid(edited, "duct");
+            ed.PointsMm[1] = new Point2(ed.PointsMm[1].X + 5000.0, ed.PointsMm[1].Y);
+            NetworkReadResult er = NetworkDrawing.Read(edited, "tee");
+            CheckTrue("ndraw.edit_ok", er.Ok);
+            CheckInt("ndraw.edit_count", er.Network.Components.Count, 7);
+            CheckStr("ndraw.edit_reported", string.Join(",", er.LengthUpdated.ToArray()), "duct");
+            Check("ndraw.edit_length", ((RigidDuct)er.Network.Components["duct"]).Length, 25.0, 1e-12);
+            CheckTrue("ndraw.edit_changes_dp", er.Network.Solve() > 7.629497821799035 + 0.1);
+            WentaTag merged = ByCid(edited, "duct").Tag;
+            merged.Set("label_h", "1A2");
+            NetworkDrawing.MergeInto(merged, NetworkDrawing.Record(er.Network, "duct", er.Network.Components["duct"], er.Meta["duct"]));
+            CheckStr("ndraw.merge_updates_length", merged.Get("length_m"), "25");
+            CheckStr("ndraw.merge_keeps_label", merged.Get("label_h"), "1A2");
+            CheckStr("ndraw.merge_keeps_guid", merged.Guid, meta["duct"].Guid);
+
+            // Orphaned and inconsistent tags are refused.
+            List<DrawnComponent> copy = AsDrawn(written);
+            DrawnComponent dup = AsDrawn(new List<DrawnComponent> { ByCid(written, "d2") })[0];
+            dup.Handle = "H99";
+            copy.Add(dup);
+            NetworkReadResult cr = NetworkDrawing.Read(copy, "tee");
+            CheckTrue("ndraw.refuse_copied_guid", !cr.Ok && HasError(cr, "same GUID"));
+
+            List<DrawnComponent> erased = AsDrawn(written);
+            erased.Remove(ByCid(erased, "tee"));
+            NetworkReadResult orr = NetworkDrawing.Read(erased, "tee");
+            CheckTrue("ndraw.refuse_orphan", !orr.Ok && HasError(orr, "orphaned tag") && HasError(orr, "'tee:branch'"));
+
+            List<DrawnComponent> wrongEntity = AsDrawn(written);
+            DrawnComponent we = ByCid(wrongEntity, "d2");
+            we.AtMm = we.PointsMm[0];
+            we.PointsMm = null;
+            CheckTrue("ndraw.refuse_duct_on_point", HasError(NetworkDrawing.Read(wrongEntity, "tee"), "not a centreline"));
+
+            List<DrawnComponent> wrongClass = AsDrawn(written);
+            ByCid(wrongClass, "d2").Tag.Class = WentaTag.ClassTerminal;
+            CheckTrue("ndraw.refuse_class_mismatch", HasError(NetworkDrawing.Read(wrongClass, "tee"), "does not match type RigidDuct"));
+
+            List<DrawnComponent> badPort = AsDrawn(written);
+            ByCid(badPort, "d2").Tag.Set("in.inlet", "tee:side");
+            CheckTrue("ndraw.refuse_unknown_port", HasError(NetworkDrawing.Read(badPort, "tee"), "not an outlet"));
+
+            List<DrawnComponent> missing = AsDrawn(written);
+            ByCid(missing, "d2").Tag.Set("length_m", (string)null);
+            ByCid(missing, "t1").Tag.Set("flow_m3s", (string)null);
+            NetworkReadResult mr = NetworkDrawing.Read(missing, "tee");
+            CheckTrue("ndraw.refuse_missing_value", HasError(mr, "'flow_m3s'"));
+            CheckTrue("ndraw.missing_length_from_geometry", mr.LengthUpdated.Contains("d2"));
+
+            List<DrawnComponent> cut = AsDrawn(written);
+            ByCid(cut, "t1").Tag.Set("in.inlet", (string)null);
+            CheckTrue("ndraw.refuse_unconnected", HasError(NetworkDrawing.Read(cut, "tee"), "'t1' is not connected"));
+
+            CheckTrue("ndraw.refuse_empty", !NetworkDrawing.Read(new List<DrawnComponent>(), "x").Ok);
+
+            // Tags that are not component records are counted and left alone.
+            List<DrawnComponent> mixed = AsDrawn(written);
+            mixed.Add(new DrawnComponent { Handle = "M1", Tag = WentaTag.New(WentaTag.ClassTerminal), AtMm = new Point2(0, 0) });
+            NetworkReadResult mx = NetworkDrawing.Read(mixed, "tee");
+            CheckTrue("ndraw.ignore_markers_ok", mx.Ok);
+            CheckInt("ndraw.ignore_markers_count", mx.Ignored, 1);
+
+            // Fitting roles, catalog entry and provenance survive the trip.
+            var att = new Network { Name = "att" };
+            att.Add("ahu", new Source("AHU"));
+            att.Add("d1", new RigidDuct("d1", new Rectangular(0.4, 0.2), 6.0));
+            att.Add("sil", new TwoPortFitting("sil", new Rectangular(0.4, 0.2), 1.7));
+            att.Add("t", new Terminal("t", 0.12, null, 0.0));
+            att.Connect("ahu", "d1");
+            att.Connect("d1", "sil");
+            att.Connect("sil", "t");
+            var am = new Dictionary<string, ComponentMeta>
+            {
+                { "sil", new ComponentMeta { Role = NetworkDrawing.ClassAttenuator, CatalogEntry = "EA-400x200", Provenance = "example-attenuators.json", DrawingScope = "L1" } },
+            };
+            List<DrawnComponent> aw = NetworkDrawing.Write(att, am, new Point2(0.0, 0.0), null);
+            CheckStr("ndraw.role_class", ByCid(aw, "sil").Tag.Class, NetworkDrawing.ClassAttenuator);
+            NetworkReadResult ar = NetworkDrawing.Read(AsDrawn(aw), "att");
+            CheckTrue("ndraw.role_read_ok", ar.Ok);
+            CheckStr("ndraw.role_roundtrip", ar.Meta["sil"].Role, NetworkDrawing.ClassAttenuator);
+            CheckStr("ndraw.catalog_roundtrip", ar.Meta["sil"].CatalogEntry, "EA-400x200");
+            CheckStr("ndraw.provenance_roundtrip", ar.Meta["sil"].Provenance, "example-attenuators.json");
+            CheckStr("ndraw.scope_roundtrip", ar.Meta["sil"].DrawingScope, "L1");
+            Check("ndraw.rect_exact", ((RigidDuct)ar.Network.Components["d1"]).CrossSection.Area, 0.08, 1e-15);
+            string attJson = NetworkJson.SerializeDesign(ar.Network, ar.Meta);
+            CheckTrue("ndraw.role_in_json", attJson.Contains("\"role\":\"attenuator\""));
+            CheckStr("ndraw.role_json_lossless", NetworkJson.SerializeDesign(att, am), attJson);
+
+            // A value that "R" alone does not round-trip on .NET Framework.
+            var odd = new WentaTag();
+            odd.Set("v", 0.84551240822557006);
+            CheckTrue("ndraw.double_roundtrip", double.Parse(odd.Get("v"), C) == 0.84551240822557006);
+
+            // A partial layout is replaced; unreachable components are drawn apart.
+            var partial = new Dictionary<string, ComponentMeta>
+            {
+                { "duct", new ComponentMeta { LayoutMm = new List<Point2> { new Point2(0, 0), new Point2(1, 1) } } },
+            };
+            var pw = new List<string>();
+            NetworkDrawing.Write(TeeNetwork(), partial, new Point2(0, 0), pw);
+            CheckTrue("ndraw.partial_layout_warned", pw.Count == 1 && pw[0].Contains("only some"));
+            Check("ndraw.partial_layout_replaced", NetworkDrawing.PolylineLengthMm(partial["duct"].LayoutMm), 20000.0, 1e-12);
+            Network loose = TeeNetwork();
+            loose.Add("spare", new RigidDuct("spare", new Round(0.1), 2.0));
+            var lw = new List<string>();
+            NetworkDrawing.Write(loose, new Dictionary<string, ComponentMeta>(), new Point2(0, 0), lw);
+            CheckTrue("ndraw.unreached_warned", lw.Count == 1 && lw[0].Contains("'spare'"));
+        }
+
         private static void RunDrawingInsulation()
         {
             double k = 0.035, d = 0.2, hi = Insulation.DefaultInnerHtc, ho = Insulation.DefaultOuterHtc;

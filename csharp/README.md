@@ -22,7 +22,7 @@ Wenta.Core/           pure C# library (compiles standalone, net48-compatible)
   Solver.cs Sizing.cs BatchSizing.cs Catalog.cs KnrMap.cs Bom.cs BomExport.cs
   Results.cs Analysis.cs PressureReport.cs Marking.cs Balancing.cs Room.cs
   Sound.cs Fan.cs FanCatalog.cs Insulation.cs Electrical.cs Fabrication.cs Development.cs
-  Clash.cs Topology.cs IfcExport.cs NetworkJson.cs Settings.cs
+  Clash.cs Topology.cs IfcExport.cs NetworkJson.cs NetworkDrawing.cs Settings.cs
 Wenta.Core.Tests/     console test runner (Program.cs, no xUnit needed)
   vectors/            CSV parity vectors (frozen golden fixtures, see below)
 catalogs/             open ζ-catalog format: FORMAT.md (spec) + example-generic,
@@ -85,6 +85,10 @@ Two kinds of assertions, both in `Wenta.Core.Tests/Program.cs`:
 - **`FanCatalog.cs`** — the open fan-curve catalog JSON (`FanCatalog.Load`,
   example `catalogs/example-fans.json`) and `FanSelection` (duty point of a
   drawn network, every fan's margin and power, `Fan.PickFan`) for `WENTAFAN`.
+- **`NetworkDrawing.cs`** — network JSON ⇄ drawing for `WENTAWRITE` /
+  `WENTAREAD`: lays a network out to scale (or reuses its stored layout),
+  builds each entity's tag record, and reads tagged entities back into a
+  network, refusing orphaned tags, copied GUIDs and inconsistent records.
 
 The ZWCAD plugin (`../zwcad-plugin`) compiles every file in `Wenta.Core/`
 into its own DLL — keep `zwcad-plugin/build.cmd`'s file list in sync with

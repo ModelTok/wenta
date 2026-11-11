@@ -55,7 +55,12 @@ namespace Wenta
 
         public void Set(string key, double value)
         {
-            Values[key] = value.ToString("R", CultureInfo.InvariantCulture);
+            // "R" does not round-trip every double on .NET Framework x64;
+            // fall back to G17, which always does.
+            string s = value.ToString("R", CultureInfo.InvariantCulture);
+            if (double.Parse(s, NumberStyles.Float, CultureInfo.InvariantCulture) != value)
+                s = value.ToString("G17", CultureInfo.InvariantCulture);
+            Values[key] = s;
         }
 
         public CrossSection Section()
