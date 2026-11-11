@@ -57,6 +57,8 @@ namespace Wenta.Core.Tests
             RunReFit();
             RunQuickConnect();
             RunDrawing();
+            RunFanCatalog(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "catalogs"));
+            RunDrawingInsulation();
             RunPerformance();
 
             Console.WriteLine();
@@ -2560,6 +2562,97 @@ namespace Wenta.Core.Tests
             CheckTrue("drawing.tag_foreign_app", WentaTag.FromXData(Xd(1001, "OTHER", 1000, "duct")) == null);
             CheckTrue("drawing.tag_empty", WentaTag.FromXData(Xd()) == null);
             CheckTrue("drawing.tag_bad_label", WentaTag.ParseSizeLabel("abc") == null);
+        }
+
+        // WENTAFAN: the open fan-curve catalog and the duty-point pick.
+        private static void RunFanCatalog(string catalogDir)
+        {
+            FanCatalog cat = FanCatalog.Load(Path.Combine(catalogDir, "example-fans.json"));
+            CheckStr("fancat.name", cat.Name, "example-fans");
+            CheckInt("fancat.count", cat.Fans.Count, 4);
+            CheckInt("fancat.points", cat.Fans[2].Curve.Points.Length, 4);
+            Check("fancat.point_value", cat.Fans[2].Curve.Points[1].StaticPressurePa, 260.0, 0.0);
+            Check("fancat.efficiency", cat.Fans[2].Efficiency ?? 0.0, 0.55, 0.0);
+
+            // Reference network duty point (source flow, critical ΔP + 150 Pa AHU).
+            double flow, required;
+            DrawingTrace t = DrawingTrace.Build(ReferenceDucts(), ReferenceMarkers());
+            FanSelection.DutyPoint(t, null, 150.0, out flow, out required);
+            double handDp = ReferenceHandBuilt().Solve();
+            Check("fancat.duty_flow", flow, 0.1, 1e-12);
+            Check("fancat.duty_pressure", required, handDp + 150.0, 1e-12);
+            int? pick = FanSelection.Pick(cat, flow, required);
+            CheckTrue("fancat.pick_reference", pick.HasValue && cat.Fans[pick.Value].Id == "ExampleFan EF-160");
+            CheckTrue("fancat.pick_matches_fan_pickfan", pick == Fan.PickFan(cat.Curves(), flow, required));
+            List<FanCandidate> cands = FanSelection.Evaluate(cat, flow, required);
+            CheckTrue("fancat.cand_out_of_range", !cands[0].MarginPa.HasValue && !cands[0].Meets);
+            CheckTrue("fancat.cand_too_weak", cands[1].MarginPa.HasValue && !cands[1].Meets && cands[1].PowerW == null);
+            Check("fancat.cand_available", cands[2].AvailablePa ?? 0.0, 260.0, 1e-12);
+            Check("fancat.cand_margin", cands[2].MarginPa ?? 0.0, 260.0 - required, 1e-12);
+            Check("fancat.cand_power", cands[2].PowerW ?? 0.0, Fan.Power(0.1, required, 0.55), 1e-12);
+            CheckTrue("fancat.cand_bigger_also_meets", cands[3].Meets);
+            CheckTrue("fancat.pick_none", FanSelection.Pick(cat, 0.1, 1000.0) == null);
+
+            ExpectError(true, "fancat.no_fans_err", delegate { FanCatalog.Parse("{\"name\":\"x\"}", "t"); });
+            ExpectError(true, "fancat.dup_id_err", delegate
+            {
+                FanCatalog.Parse("{\"fans\":[{\"id\":\"a\",\"points\":[[0,10],[1,0]]},{\"id\":\"a\",\"points\":[[0,10],[1,0]]}]}", "t");
+            });
+            ExpectError(true, "fancat.bad_point_err", delegate
+            {
+                FanCatalog.Parse("{\"fans\":[{\"id\":\"a\",\"points\":[[0,10],[1]]}]}", "t");
+            });
+            ExpectError(true, "fancat.decreasing_flow_err", delegate
+            {
+                FanCatalog.Parse("{\"fans\":[{\"id\":\"a\",\"points\":[[1,10],[0,0]]}]}", "t");
+            });
+            ExpectError(true, "fancat.bad_eta_err", delegate
+            {
+                FanCatalog.Parse("{\"fans\":[{\"id\":\"a\",\"efficiency\":1.5,\"points\":[[0,10],[1,0]]}]}", "t");
+            });
+            ExpectError(true, "fancat.future_version_err", delegate
+            {
+                FanCatalog.Parse("{\"version\":2,\"fans\":[]}", "t");
+            });
+            ExpectError(true, "fancat.negative_extra_err", delegate
+            {
+                double a, b;
+                FanSelection.DutyPoint(DrawingTrace.Build(ReferenceDucts(), ReferenceMarkers()), null, -1.0, out a, out b);
+            });
+        }
+
+        // WENTAINSULATE: DrawingInsulation is Insulation + SelectThickness for a round run.
+        private static void RunDrawingInsulation()
+        {
+            double k = 0.035, d = 0.2, hi = Insulation.DefaultInnerHtc, ho = Insulation.DefaultOuterHtc;
+            InsulationSizing c = DrawingInsulation.Size(new Round(d), DrawingInsulation.Condensation, "mineral_wool",
+                8.0, 24.0, 15.8, 0.0);
+            double reqC = Insulation.RequiredThicknessCondensation(8.0, 15.8, 24.0, k, d, hi, ho);
+            Check("drawinsul.cond_required", c.RequiredM, reqC, 1e-12);
+            Check("drawinsul.cond_selected", c.SelectedM, Insulation.SelectThickness(reqC), 1e-12);
+            CheckTrue("drawinsul.cond_step_ge_required", c.SelectedM >= c.RequiredM);
+            Check("drawinsul.cond_heat_loss", c.HeatLossWPerM,
+                Insulation.HeatLossWithInsulation(8.0, 24.0, k, d, c.SelectedM, hi, ho), 1e-12);
+            InsulationSizing h = DrawingInsulation.Size(new Round(d), DrawingInsulation.HeatLoss, "mineral_wool",
+                60.0, 20.0, 0.0, 25.0);
+            double reqH = Insulation.RequiredThicknessHeatLoss(60.0, 20.0, 25.0, k, d, hi, ho);
+            Check("drawinsul.heat_required", h.RequiredM, reqH, 1e-12);
+            CheckTrue("drawinsul.heat_meets_target", Math.Abs(h.HeatLossWPerM) <= 25.0);
+            InsulationSizing none = DrawingInsulation.Size(new Round(d), DrawingInsulation.Condensation, "mineral_wool",
+                16.0, 24.0, 15.0, 0.0);
+            CheckTrue("drawinsul.none_needed", none.RequiredM == 0.0 && none.SelectedM == 0.0);
+            ExpectError(true, "drawinsul.rect_err", delegate
+            {
+                DrawingInsulation.Size(new Rectangular(0.4, 0.2), DrawingInsulation.Condensation, "mineral_wool", 8.0, 24.0, 15.8, 0.0);
+            });
+            ExpectError(true, "drawinsul.material_err", delegate
+            {
+                DrawingInsulation.Size(new Round(d), DrawingInsulation.Condensation, "straw", 8.0, 24.0, 15.8, 0.0);
+            });
+            ExpectError(true, "drawinsul.purpose_err", delegate
+            {
+                DrawingInsulation.Size(new Round(d), "fire", "mineral_wool", 8.0, 24.0, 15.8, 0.0);
+            });
         }
 
         private static void RunPerformance()

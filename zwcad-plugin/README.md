@@ -19,6 +19,10 @@ Mojo, Rust or WASM at runtime.
 | `WENTAPRESSURE` | Critical-path `PressureReport` + per-component table at a site altitude, `%TEMP%\wenta_pressure.csv`, `WENTA-CRIT` overlay, change since the previous run |
 | `WENTASIZE` | Sizes every run (Velocity / EqualFriction / Budget / Noise / Aspect, round or rectangular) via `DrawingSizing`, writes the tag and updates the `WENTA-LABEL` labels in place |
 | `WENTABALANCE` | Damper ζ / opening per terminal (`ReFit.Hints`, `DrawingBalancing`), written to the markers and their labels, `CHANGE HARDWARE` flag, `%TEMP%\wenta_balance.csv` |
+| `WENTAFAN` | Duty point (terminal flow, critical ΔP + extra) against a fan-curve catalog JSON (`example-fans.json`); lists every fan with margin and power, picks the first that meets it (`Fan.PickFan`), writes it to the source marker |
+| `WENTAINSULATE` | EN ISO 12241 thickness (condensation or heat-loss limit) for each sized round run via `DrawingInsulation`, snapped to the standard step; tag + label on `WENTA-INSUL`, updated in place |
+| `WENTASOUND` | Regenerated noise of the run feeding each terminal through the room equation against the space type's NC limit (`DrawingSound`); worst room first, terminal tags, `%TEMP%\wenta_sound.csv` |
+| `WENTAHELP` | Command list and the paths of the EN/PL user guides; optionally opens one |
 
 ## UI
 
@@ -26,7 +30,7 @@ Mojo, Rust or WASM at runtime.
   `tools/MakeCuix.cs`, modeled 1:1 on ZWSOFT's own `APP+.cuix` package format).
   Buttons: Duct Section · Wenta Panel · Plugin Info · Fitting Catalog ·
   BOM + KNR · Tag Marker · Trace Network · Pressure Drop · Size Network ·
-  Balance Dampers. Load once with `MENULOAD`; verified live in the ZWCAD UI tree
+  Balance Dampers · Select Fan · Insulate · Room Sound · Wenta Help. Load once with `MENULOAD`; verified live in the ZWCAD UI tree
   (`Wenta [ControlType.TabItem]`, see `uia-check.ps1`).
 - **Palette** — no longer auto-opens at startup (user preference: ribbon);
   `WENTAPANEL` / ribbon button opens it on demand.
@@ -55,7 +59,10 @@ main, a tee, a 3 m straight run and a 3 m branch, tags them and runs every
 network command. Verified on ZWCAD 2021: trace 4.43 Pa at the default Ø200,
 sized (velocity 4 m/s → Ø200 / Ø150 / Ø125) 8.00 Pa, a second `WENTASIZE`
 updates the three labels in place, balance ζ 0.15 / 93 % open on the
-straight-run terminal — the values `Wenta.Core` computes for the layout.
+straight-run terminal; then `WENTAFAN` with 150 Pa extra picks
+`ExampleFan EF-160` (0.12 m³/s, 160.7 Pa), `WENTAINSULATE` gives 20 mm on
+every run and updates its labels on the second run, and `WENTASOUND` and
+`WENTAHELP` run — the values `Wenta.Core` computes for the layout.
 
 ## ZWCAD platform facts (hard-won, keep)
 
@@ -75,7 +82,7 @@ straight-run terminal — the values `Wenta.Core` computes for the layout.
 ## Repo map
 
 ```
-WentaZwcad/        plugin sources (Commands, Plugin, WentaPanel, NetworkCommands, CadIo)
+WentaZwcad/        plugin sources (Commands, Plugin, WentaPanel, NetworkCommands, DesignCommands, CadIo)
 ../csharp/         Wenta.Core + test suite (frozen vectors) + catalogs
 tools/MakeCuix.cs  CUIX ribbon package builder
 build.cmd install.ps1 uninstall.ps1   build & deploy

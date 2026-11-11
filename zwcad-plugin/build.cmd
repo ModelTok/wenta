@@ -40,6 +40,7 @@ if not exist "%OUT%" mkdir "%OUT%"
   "%SRC%\WentaPanel.cs" ^
   "%SRC%\CadIo.cs" ^
   "%SRC%\NetworkCommands.cs" ^
+  "%SRC%\DesignCommands.cs" ^
   "%CORE%\Units.cs" ^
   "%CORE%\Fluid.cs" ^
   "%CORE%\Geometry.cs" ^
@@ -78,11 +79,15 @@ if not exist "%OUT%" mkdir "%OUT%"
   "%CORE%\MultiDrawing.cs" ^
   "%CORE%\ReFit.cs" ^
   "%CORE%\QuickConnect.cs" ^
-  "%CORE%\DrawingModel.cs"
+  "%CORE%\DrawingModel.cs" ^
+  "%CORE%\FanCatalog.cs"
 
 if errorlevel 1 ( echo BUILD FAILED & exit /b 1 )
 
 copy /y "%REPO%\csharp\catalogs\example-generic.json" "%OUT%" >nul
+copy /y "%REPO%\csharp\catalogs\example-fans.json" "%OUT%" >nul
+copy /y "%REPO%\docs\user-guide.en.md" "%OUT%" >nul
+copy /y "%REPO%\docs\user-guide.pl.md" "%OUT%" >nul
 
 rem ---- MakeCuix.exe (CUIX ribbon package builder) -> Wenta.CUIX ----
 %CSC% ^
@@ -96,5 +101,5 @@ if errorlevel 1 ( echo BUILD FAILED: MakeCuix & exit /b 1 )
 "%OUT%\MakeCuix.exe" "%OUT%"
 if errorlevel 1 ( echo BUILD FAILED: Wenta.CUIX & exit /b 1 )
 
-echo BUILD OK: %OUT%\WentaZwcad.dll  (+ example-generic.json)
+echo BUILD OK: %OUT%\WentaZwcad.dll  (+ example-generic.json, example-fans.json, user guides)
 endlocal

@@ -110,7 +110,7 @@ może pozostać w profilu ZWCAD do czasu usunięcia jej przez `MENULOAD`/`CUI`.
 
 ## 3. Opis poleceń
 
-Istnieje dziesięć poleceń. Każde dopisuje jeden wiersz do dziennika
+Istnieje czternaście poleceń. Każde dopisuje jeden wiersz do dziennika
 `%TEMP%\wenta_zwcad_test.txt` (np. `WENTADUCT ok  200×200 mm  0,150 m3/s
 3,75 m/s  0,9530 Pa/m`). Obliczenia doboru i spadku ciśnienia wykonuje
 `Wenta.Core`; we wtyczce nie ma żadnych formuł.
@@ -316,12 +316,70 @@ domyślnym Ø200; po `WENTASIZE` metodą prędkości 4 m/s (magistrala Ø200,
 przelot Ø150, odgałęzienie Ø125) 8,00 Pa, a drugie `WENTASIZE`
 zaktualizowało trzy etykiety, nie dodając nowych; `WENTABALANCE` ζ 0,15 /
 otwarcie 93 % dla terminala na przelocie, a odgałęzienie jest drogą krytyczną
-i jego przepustnica pozostaje całkowicie otwarta. Są to wartości, które
-`Wenta.Core` oblicza dla tego układu.
+i jego przepustnica pozostaje całkowicie otwarta. Następnie skrypt uruchamia
+`WENTAFAN` (ciśnienie dodatkowe 150 Pa: `ExampleFan EF-160` przy 0,12 m³/s
+i 160,7 Pa), dwukrotnie `WENTAINSULATE` (20 mm wełny mineralnej na każdym
+odcinku; drugie uruchomienie aktualizuje trzy etykiety), `WENTASOUND`
+i `WENTAHELP`. Są to wartości, które `Wenta.Core` oblicza dla tego układu.
 
-### 3.13 Karta wstęgi „Wenta”
+### 3.13 `WENTAFAN` — wentylator w punkcie pracy
 
-Jeden panel z dziesięcioma dużymi przyciskami, każdy uruchamia jedno polecenie:
+Należy zaznaczyć sieć (jak w §3.8). Zapytania: wysokość położenia,
+`Extra pressure outside the ductwork (AHU, filters, coils) [Pa] <0>` oraz
+plik katalogu wentylatorów (Enter wybiera `example-fans.json` obok DLL).
+Punkt pracy to suma strumieni terminali oraz spadek ciśnienia na drodze
+krytycznej powiększony o ciśnienie dodatkowe (`FanSelection.DutyPoint`).
+Polecenie wypisuje każdy wentylator z katalogu z ciśnieniem, jakie daje jego
+charakterystyka przy strumieniu obliczeniowym, zapasem oraz mocą Q·p/η
+w punkcie pracy, jeśli wentylator go spełnia i ma podaną sprawność
+(`Fan.Margin`, `Fan.Power`, §4.11). Wybrany wentylator, oznaczony `*`, to
+pierwszy w kolejności katalogu, który spełnia punkt pracy (`Fan.PickFan`);
+jest zapisywany w znaczniku źródła (`fan_id`, `fan_flow_m3s`,
+`fan_required_pa`, `fan_margin_pa`, `fan_power_w`). Format katalogu opisuje
+§5.4; przykładowe wentylatory są fikcyjne.
+
+### 3.14 `WENTAINSULATE` — grubość izolacji odcinków
+
+Należy zaznaczyć dobrane osie kanałów (odcinki bez wymiaru w znaczniku
+`WENTA` są pomijane; najpierw trzeba uruchomić `WENTASIZE`). Zapytania: cel
+`[Condensation/HeatLoss]`, materiał `[MineralWool/PeFoam/Epdm/Pir/PuFoam]`,
+temperatura powietrza w kanale, temperatura otoczenia, a następnie punkt rosy
+otoczenia (kondensacja) albo dopuszczalne straty ciepła w W/m. Dla każdego
+odcinka okrągłego polecenie pobiera wymaganą grubość z `Insulation`
+(EN ISO 12241, §4.12), zaokrągla ją w górę do najbliższej grubości
+handlowej i podaje straty ciepła przy tej grubości. Jeśli kanał bez izolacji
+już spełnia cel, polecenie podaje, że izolacja nie jest potrzebna, zamiast
+najmniejszej grubości. Wynik trafia do znacznika odcinka (`insul_mm`,
+`insul_required_mm`, `insul_material`, `insul_purpose`,
+`insul_heat_loss_w_per_m`) oraz do etykiety na warstwie `WENTA-INSUL`, np.
+`INS 20 mm mineral_wool (condensation)`. Ponowne uruchomienie aktualizuje
+etykiety w miejscu. Odcinki prostokątne są pomijane z komunikatem, ponieważ
+model biblioteki jest walcowy. Izolacja zwiększa wymiar zewnętrzny kanału,
+co musi uwzględnić praca nad 3D i kolizjami z planu rozwoju.
+
+### 3.15 `WENTASOUND` — hałas w pomieszczeniu dla każdego terminala
+
+Należy zaznaczyć sieć. Zapytania: rodzaj pomieszczenia
+`[studio/bedroom/office/classroom/retail/industrial]`, powierzchnia
+przegród pomieszczenia (m²) i średni współczynnik pochłaniania α. Dla
+każdego terminala polecenie bierze hałas regenerowany odcinka, który go
+zasila, przenosi go do pomieszczenia równaniem pomieszczenia i porównuje
+wynik z limitem dla rodzaju pomieszczenia (`DrawingSound.Rooms`, §4.10).
+Pomieszczenia są wypisywane od najgorszego, wartości trafiają do znaczników
+terminali (`sound_lp_db`, `sound_nc_limit`, `sound_ok`), a tabela do
+**`%TEMP%\wenta_sound.csv`**. Dobór tłumika (`WENTAATTEN`) nie jest jeszcze
+zaimplementowany.
+
+### 3.16 `WENTAHELP` — lista poleceń i podręcznik
+
+Wypisuje wszystkie polecenia z jednowierszowym opisem oraz ścieżki
+podręcznika angielskiego i polskiego, które `install.ps1` kopiuje obok DLL.
+Zapytanie `Open the user guide [English/Polski/No] <No>` otwiera wybrany
+podręcznik (plik Markdown) programem, który Windows kojarzy z `.md`.
+
+### 3.17 Karta wstęgi „Wenta”
+
+Jeden panel z czternastoma dużymi przyciskami, każdy uruchamia jedno polecenie:
 
 | Przycisk | Polecenie |
 |---|---|
@@ -335,11 +393,15 @@ Jeden panel z dziesięcioma dużymi przyciskami, każdy uruchamia jedno poleceni
 | Pressure Drop | `WENTAPRESSURE` |
 | Size Network | `WENTASIZE` |
 | Balance Dampers | `WENTABALANCE` |
+| Select Fan | `WENTAFAN` |
+| Insulate | `WENTAINSULATE` |
+| Room Sound | `WENTASOUND` |
+| Wenta Help | `WENTAHELP` |
 
-### 3.14 Plan rozwoju
+### 3.18 Plan rozwoju
 
-Polecenia takie jak `WENTASOUND`, `WENTAFAN`, `WENTAINSULATE`, `WENTAFITTING`,
-`WENTAREAD`/`WENTAWRITE` i `WENTAHELP` są planowane, nie zaimplementowane; część biblioteczna kilku z nich już istnieje (patrz §4).
+Polecenia takie jak `WENTAFITTING`, `WENTAATTEN` i `WENTAREAD`/`WENTAWRITE`
+są planowane, nie zaimplementowane; część biblioteczna kilku z nich już istnieje (patrz §4).
 Plan znajduje się w `zwcad-plugin/ROADMAP.md` oraz w zgłoszeniach GitHub
 repozytorium `ModelTok/wenta`.
 
@@ -583,7 +645,7 @@ współczynnikiem mocy i częstotliwością; `Current()` = P/(U·cos φ).
 
 ## 5. Pliki danych do edycji przez użytkownika
 
-Wszystkie trzy formaty to JSON w UTF-8 z całkowitą wersją schematu; czytnik
+Wszystkie cztery formaty to JSON w UTF-8 z całkowitą wersją schematu; czytnik
 odrzuca plik deklarujący wersję nowszą niż rozumie, a nieznane klucze są
 ignorowane. Liczby używają kropki dziesiętnej niezależnie od ustawień
 regionalnych Windows.
@@ -678,6 +740,29 @@ starsze aliasy `wenta_class`/`from`/`to`.
 
 ---
 
+### 5.4 Katalog wentylatorów (`csharp/catalogs/example-fans.json`, wersja 1)
+
+```json
+{
+  "name": "example-fans",
+  "version": 1,
+  "description": "...",
+  "fans": [
+    { "id": "ExampleFan EF-160", "efficiency": 0.55, "source": "fictional example",
+      "points": [[0.0, 320.0], [0.1, 260.0], [0.2, 150.0], [0.3, 0.0]] }
+  ]
+}
+```
+
+Każdy wentylator ma `id` (niepowtarzalne w pliku) i `points`, listę par
+`[flow_m3s, static_pa]` o ściśle rosnących strumieniach (co najmniej dwie).
+`efficiency` (0 < η ≤ 1) jest opcjonalne i służy tylko do obliczenia mocy;
+`source` i `notes` to dowolny tekst. Kolejność ma znaczenie: `WENTAFAN`
+wybiera pierwszy wentylator, który spełnia punkt pracy, więc wentylatory
+należy podawać od najmniejszego do największego. Wczytanie:
+`FanCatalog.Load(path)`. Cztery wentylatory w `example-fans.json` są
+zmyślone i służą tylko do sprawdzenia formatu.
+
 ## 6. Rozwiązywanie problemów
 
 Fakty o platformie ZWCAD 2021 zapisane w `zwcad-plugin/README.md`:
@@ -701,7 +786,8 @@ Fakty o platformie ZWCAD 2021 zapisane w `zwcad-plugin/README.md`:
 - **Co wtyczka faktycznie zrobiła?** Każde polecenie zapisuje wiersz do
   `%TEMP%\wenta_zwcad_test.txt`; `WENTABOM` zapisuje `%TEMP%\wenta_bom.csv`,
   `WENTATRACE` `wenta_trace.json`, `WENTAPRESSURE` `wenta_pressure.csv`,
-  a `WENTABALANCE` `wenta_balance.csv`, wszystkie w `%TEMP%`.
+  `WENTABALANCE` `wenta_balance.csv`, a `WENTASOUND` `wenta_sound.csv`,
+  wszystkie w `%TEMP%`.
 - **`open duct end(s) without a terminal flow`.** Każdy otwarty koniec poza
   źródłem wymaga znacznika terminala `WENTATAG` w promieniu 150 mm; komunikat
   podaje położenia.

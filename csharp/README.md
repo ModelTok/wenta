@@ -21,7 +21,7 @@ Wenta.Core/           pure C# library (compiles standalone, net48-compatible)
   FittingsLibrary.cs Elbow.cs ReCorrections.cs Components.cs Network.cs
   Solver.cs Sizing.cs BatchSizing.cs Catalog.cs KnrMap.cs Bom.cs BomExport.cs
   Results.cs Analysis.cs PressureReport.cs Marking.cs Balancing.cs Room.cs
-  Sound.cs Fan.cs Insulation.cs Electrical.cs Fabrication.cs Development.cs
+  Sound.cs Fan.cs FanCatalog.cs Insulation.cs Electrical.cs Fabrication.cs Development.cs
   Clash.cs Topology.cs IfcExport.cs NetworkJson.cs Settings.cs
 Wenta.Core.Tests/     console test runner (Program.cs, no xUnit needed)
   vectors/            CSV parity vectors (frozen golden fixtures, see below)
@@ -79,8 +79,12 @@ Two kinds of assertions, both in `Wenta.Core.Tests/Program.cs`:
   commands: the `WENTA` XData tag (`WentaTag`, v2 with class + GUID, legacy
   records still read), drawn centrelines and markers in millimetres →
   `DrawingTrace` (network plus entity ↔ component maps), per-run sizing
-  (`DrawingSizing`), damper settings (`DrawingBalancing`) and room sound
-  (`DrawingSound`). No new math; it maps data onto the modules above.
+  (`DrawingSizing`), damper settings (`DrawingBalancing`), room sound
+  (`DrawingSound`) and insulation (`DrawingInsulation`). No new math; it
+  maps data onto the modules above.
+- **`FanCatalog.cs`** — the open fan-curve catalog JSON (`FanCatalog.Load`,
+  example `catalogs/example-fans.json`) and `FanSelection` (duty point of a
+  drawn network, every fan's margin and power, `Fan.PickFan`) for `WENTAFAN`.
 
 The ZWCAD plugin (`../zwcad-plugin`) compiles every file in `Wenta.Core/`
 into its own DLL — keep `zwcad-plugin/build.cmd`'s file list in sync with

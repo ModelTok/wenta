@@ -266,11 +266,12 @@ namespace WentaZwcad
             return alt > 0.0 ? Fluid.AirAtAltitude(alt) : Fluid.StandardAir();
         }
 
-        internal static double? PromptDouble(Editor ed, string message, double def, bool allowZero = false)
+        internal static double? PromptDouble(Editor ed, string message, double def, bool allowZero = false,
+            bool allowNegative = false)
         {
             var o = new PromptDoubleOptions(message)
             {
-                AllowNone = true, AllowNegative = false, AllowZero = allowZero,
+                AllowNone = true, AllowNegative = allowNegative, AllowZero = allowZero,
                 DefaultValue = def, UseDefaultValue = true,
             };
             PromptDoubleResult r = ed.GetDouble(o);

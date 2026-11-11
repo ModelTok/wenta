@@ -1,0 +1,32 @@
+{
+  "name": "example-fans",
+  "version": 1,
+  "description": "Fictional fan curves (static pressure against flow) to exercise the fan catalog format and WENTAFAN. Every number is invented; replace them with manufacturer data before selecting a real fan.",
+  "fans": [
+    {
+      "id": "ExampleFan EF-100",
+      "efficiency": 0.45,
+      "source": "fictional example",
+      "points": [[0.0, 200.0], [0.05, 160.0], [0.08, 0.0]]
+    },
+    {
+      "id": "ExampleFan EF-160L",
+      "efficiency": 0.5,
+      "source": "fictional example",
+      "notes": "low-pressure variant",
+      "points": [[0.0, 180.0], [0.1, 120.0], [0.2, 0.0]]
+    },
+    {
+      "id": "ExampleFan EF-160",
+      "efficiency": 0.55,
+      "source": "fictional example",
+      "points": [[0.0, 320.0], [0.1, 260.0], [0.2, 150.0], [0.3, 0.0]]
+    },
+    {
+      "id": "ExampleFan EF-200",
+      "efficiency": 0.6,
+      "source": "fictional example",
+      "points": [[0.0, 500.0], [0.2, 420.0], [0.4, 250.0], [0.5, 0.0]]
+    }
+  ]
+}
