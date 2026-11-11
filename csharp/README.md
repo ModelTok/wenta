@@ -23,7 +23,7 @@ Wenta.Core/           pure C# library (compiles standalone, net48-compatible)
   Results.cs Analysis.cs PressureReport.cs Marking.cs Balancing.cs Room.cs
   Sound.cs Fan.cs FanCatalog.cs Insulation.cs Electrical.cs Fabrication.cs Development.cs
   Clash.cs Topology.cs IfcExport.cs NetworkJson.cs NetworkDrawing.cs Settings.cs
-  Attenuators.cs Markdown.cs
+  Attenuators.cs Markdown.cs NetworkEdit.cs Schedule.cs
 Wenta.Core.Tests/     console test runner (Program.cs, no xUnit needed)
   vectors/            CSV parity vectors (frozen golden fixtures, see below)
 catalogs/             open ζ-catalog format: FORMAT.md (spec) + example-generic,
@@ -90,6 +90,11 @@ Two kinds of assertions, both in `Wenta.Core.Tests/Program.cs`:
   `WENTAREAD`: lays a network out to scale (or reuses its stored layout),
   builds each entity's tag record, and reads tagged entities back into a
   network, refusing orphaned tags, copied GUIDs and inconsistent records.
+- **`Schedule.cs`** — the `WENTASCHEDULE` table (`Schedule.Build`: Bom
+  rows with `Marking` branch numbers, sorted by kind and id, invariant
+  culture, totals, CSV) and the `WENTAFLAT` layout
+  (`Schedule.FlatPatterns`: round rigid ducts developed with
+  `Development.RoundDuctDevelopment`, side by side, others skipped).
 - **`NetworkEdit.cs`** — editing a drawn network for `WENTAPROPS`,
   `WENTAMOVE`, `WENTASTRETCH` and `WENTAREFIT`: one property (diameter
   snapped to EN 1506, width, height, length, flow, ζ), stretch a duct and

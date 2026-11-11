@@ -22,7 +22,7 @@ namespace WentaZwcad
         private static readonly CultureInfo C = CultureInfo.InvariantCulture;
 
         // The drawn network, or null (with the reason shown and logged).
-        private static NetworkReadResult ReadDrawn(Document doc, string cmd)
+        internal static NetworkReadResult ReadDrawn(Document doc, string cmd)
         {
             var ids = new Dictionary<string, ObjectId>();
             NetworkReadResult r = NetworkDrawing.Read(RoundTripCommands.Scan(doc.Database, ids),

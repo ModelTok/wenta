@@ -306,6 +306,8 @@ namespace WentaZwcad
             new[] { "WENTAMOVE", "move a drawn tee, fitting or terminal; joined ducts follow" },
             new[] { "WENTASTRETCH", "new length for a drawn duct; downstream moves with it" },
             new[] { "WENTAREFIT", "new terminal flow: re-size, re-solve and re-set dampers" },
+            new[] { "WENTASCHEDULE", "schedule table of the drawn network; XLSX, JSON and CSV" },
+            new[] { "WENTAFLAT", "flat developments of the round ducts for fabrication" },
             new[] { "WENTAHELLO", "version banner" },
             new[] { "WENTAHELP", "this list and the user guide" },
         };

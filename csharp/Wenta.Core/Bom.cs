@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using KnrCodeMap = Wenta.KnrMap;
 
@@ -88,7 +89,7 @@ namespace Wenta
                 {
                     var fd = (FlexDuct)c;
                     row.Kind = "flex";
-                    row.Description = "flex D=" + (fd.Diameter * 1000) + "mm";
+                    row.Description = "flex D=" + (fd.Diameter * 1000).ToString(CultureInfo.InvariantCulture) + "mm";
                     row.Length = fd.Length;
                     row.Area = fd.Area * fd.Length;
                     shape = Sizing.ShapeRound;
@@ -96,7 +97,7 @@ namespace Wenta
                 else if (c is Terminal)
                 {
                     row.Kind = "terminal";
-                    row.Description = "terminal " + ((Terminal)c).Flowrate + " m3/s";
+                    row.Description = "terminal " + ((Terminal)c).Flowrate.ToString(CultureInfo.InvariantCulture) + " m3/s";
                 }
                 else if (c is Source)
                 {
@@ -106,15 +107,15 @@ namespace Wenta
                 else if (c is Tee)
                 {
                     row.Kind = "fitting";
-                    row.Description = "tee (straight z=" + ((Tee)c).ZetaStraight
-                        + ", branch z=" + ((Tee)c).ZetaBranch + ")";
+                    row.Description = "tee (straight z=" + ((Tee)c).ZetaStraight.ToString(CultureInfo.InvariantCulture)
+                        + ", branch z=" + ((Tee)c).ZetaBranch.ToString(CultureInfo.InvariantCulture) + ")";
                     shape = ShapeOf(((Tee)c).CrossSection);
                     type = "tee";
                 }
                 else if (c is TwoPortFitting)
                 {
                     row.Kind = "fitting";
-                    row.Description = "in-line fitting z=" + ((TwoPortFitting)c).Zeta;
+                    row.Description = "in-line fitting z=" + ((TwoPortFitting)c).Zeta.ToString(CultureInfo.InvariantCulture);
                     shape = ShapeOf(((TwoPortFitting)c).CrossSection);
                     type = "inline";
                 }

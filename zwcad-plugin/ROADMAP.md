@@ -135,7 +135,7 @@ The modules `venti` proved out are all in C# now (library half done in
 | `re` (Re/size ζ corrections) | `ReCorrections.cs` | ✓ | #21 |
 | `topology` (polylines → network, flatten) | `Topology.cs` | ✓ | `WENTATRACE` ships (#19) |
 | `clash` (segment clearance) | `Clash.cs` | ✓ | #60 |
-| `fabrication` / `development` | `Fabrication.cs` `Development.cs` | ✓ | #29 |
+| `fabrication` / `development` | `Fabrication.cs` `Development.cs` | ✓ | `WENTAFLAT` draws round-duct developments (#29); fittings and dimensioned drawings open |
 
 ## Phase 5 — PL-market items (item 3 of the competitive review)
 
@@ -145,8 +145,10 @@ The modules `venti` proved out are all in C# now (library half done in
    active catalog from the ribbon is the remaining plugin bit.
 2. **KNR-ready BOM** — `KnrMap` ✓ makes the codes a per-edition data file
    with unmapped kinds reported (#54 closed); `BomExport` ✓ writes JSON and
-   XLSX. Per-vendor schedules and dimensioned fabrication drawings as
-   drawing tables are still open (#29).
+   XLSX; `WENTASCHEDULE` ✓ draws the schedule as a drawing table that
+   updates in place and `WENTAFLAT` ✓ the round-duct flat patterns.
+   Per-vendor schedules and dimensioned fitting fabrication drawings are
+   still open (#29).
 3. **Multi-drawing / multi-storey projects** — `MultiDrawing` ✓ merges
    scoped drawing documents linked by stable GUIDs into one solvable
    network, with validation; the storey-manager palette is #55.
