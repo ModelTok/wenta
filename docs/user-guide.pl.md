@@ -110,7 +110,7 @@ może pozostać w profilu ZWCAD do czasu usunięcia jej przez `MENULOAD`/`CUI`.
 
 ## 3. Opis poleceń
 
-Istnieje pięć poleceń. Każde dopisuje jeden wiersz do dziennika
+Istnieje dziesięć poleceń. Każde dopisuje jeden wiersz do dziennika
 `%TEMP%\wenta_zwcad_test.txt` (np. `WENTADUCT ok  200×200 mm  0,150 m3/s
 3,75 m/s  0,9530 Pa/m`). Obliczenia doboru i spadku ciśnienia wykonuje
 `Wenta.Core`; we wtyczce nie ma żadnych formuł.
@@ -139,9 +139,13 @@ Następnie rysuje w przestrzeni modelu, w początku układu:
   tarcia Swamee–Jain, chropowatość bezwzględna 0,1 mm, powietrze
   standardowe).
 
-Obrys otrzymuje dane XData pod nazwą aplikacji `WENTA`: ciąg `duct`,
-strumień, prędkość, kod kształtu (`1` okrągły, `0` prostokątny) oraz etykietę
-wymiaru. W wierszu poleceń pojawia się
+Obrys otrzymuje znacznik `WENTA` (XData, nazwa aplikacji `WENTA`): klasę
+`duct`, znacznik schematu `v2`, identyfikator GUID, a następnie pary
+klucz/wartość jako ciągi znaków (`geometry` = `section`, `shape`, `d_mm` lub
+`w_mm`/`h_mm`, `flow_m3s`, `velocity_ms`), zapisane w kulturze niezmiennej.
+Polecenia sieciowe (§3.6–3.11) używają tego samego układu. Rekord z wcześniejszych
+wersji (`duct`, strumień, prędkość, kod kształtu, etykieta wymiaru) jest nadal
+odczytywany. W wierszu poleceń pojawia się
 `Sized: 200×200 mm · 0.150 m³/s · v=3.75 m/s (target 4.0) · 0.95 Pa/m`
 (wartości ze zweryfikowanego przebiegu bezobsługowego dla `Rectangular`,
 `0.15`, `4.0`).
@@ -203,9 +207,121 @@ przycisku na wstędze.
 Wypisuje `Wenta duct plugin (wenta C# core, MIT). ZWCAD version: <wersja>`
 i zapisuje wersję ZWCAD do dziennika (zweryfikowano: `21.10.21.0`).
 
-### 3.6 Karta wstęgi „Wenta”
+### 3.6 Rysowanie sieci dla poleceń sieciowych
 
-Jeden panel z pięcioma dużymi przyciskami, każdy uruchamia jedno polecenie:
+`WENTATRACE`, `WENTAPRESSURE`, `WENTASIZE` i `WENTABALANCE` odczytują sieć
+z rysunku. Należy ją narysować następująco (jednostki: milimetry):
+
+- **Osie kanałów** — jeden `LINE`, otwarta `LWPOLYLINE` lub `ARC` na każdy
+  odcinek. Odcinki łączą się we wspólnych punktach końcowych (tolerancja
+  przyciągania 1 mm). Punkt, w którym spotykają się trzy odcinki, staje się
+  trójnikiem; cztery lub więcej odcinków w jednym punkcie oraz zamknięte pętle
+  są odrzucane. Łuki i wybrzuszenia polilinii są odwzorowywane cięciwami
+  o kącie nie większym niż 5°. Zamknięte polilinie (np. obrys z `WENTADUCT`)
+  są pomijane.
+- **Znaczniki** — wstawiane poleceniem `WENTATAG` (§3.7): jedno *źródło*
+  przy końcu centrali, jeden *nawiewnik/wywiewnik* (terminal) ze strumieniem
+  obliczeniowym przy każdym pozostałym otwartym końcu oraz opcjonalnie
+  *przepustnice* na odgałęzieniach. Znacznik terminala musi leżeć nie dalej
+  niż 150 mm od otwartego końca; otwarty koniec bez strumienia przerywa
+  polecenie, które podaje położenia do oznaczenia.
+- **Wymiary** — odcinek przyjmuje przekrój ze znacznika `WENTA` zapisanego
+  przez `WENTASIZE` (lub starszego rekordu `WENTADUCT`); odcinki bez
+  znacznika mają Ø200.
+
+W każdym trójniku odnoga, która przedłuża kierunek odcinka dopływowego, jest
+przelotem (ζ = 0), a druga odgałęzieniem (ζ = 0,5), więc kolejność i kierunek
+rysowania linii nie mają znaczenia. Gdy polecenie prosi o obiekty, należy
+zaznaczyć całą sieć razem ze znacznikami (działa `ALL`: etykiety i nakładki
+są pomijane).
+
+### 3.7 `WENTATAG` — znacznik terminala, źródła lub przepustnicy
+
+Zapytania: `Marker [Terminal/Source/Damper] <Terminal>`, położenie, a dla
+terminala `Terminal design flow [m³/s] <0.1>`. Polecenie rysuje okrąg Ø200 na
+warstwie `WENTA-TAG` z etykietą (`T 0.060 m³/s`, `SRC` lub `DMP`) i zapisuje
+na nim znacznik `WENTA`. Ponowne oznaczenie w promieniu 150 mm od istniejącego
+znacznika zmienia ten znacznik (klasę, strumień, położenie) zamiast dodawać
+drugi i usuwa jego poprzedni wynik równoważenia.
+
+### 3.8 `WENTATRACE` — budowa sieci z rysunku
+
+Buduje `Wenta.Network` z zaznaczenia (`DrawingTrace.Build` na bazie
+`Topology.Trace`), rozwiązuje ją dla powietrza standardowego i wypisuje
+liczbę odcinków, trójników i terminali, łączną długość kanałów, strumień przy
+źródle, spadek ciśnienia na drodze krytycznej oraz po jednym wierszu na
+odcinek (`duct0  5.00 m  Ø200  0.100 m³/s`). Sieć jest zapisywana do
+**`%TEMP%\wenta_trace.json`** (Network JSON, §5.3); elementy pochodzące
+z oznaczonych obiektów mają identyfikator GUID tego obiektu.
+
+### 3.9 `WENTAPRESSURE` — spadek ciśnienia na drodze krytycznej
+
+Pyta o wysokość położenia (`<0>` m; powyżej 0 gęstość powietrza wynika
+z `Fluid.AirAtAltitude`). Wypisuje tabelę `PressureReport` drogi krytycznej
+oraz tabelę strumienia, prędkości i Δp dla każdego elementu
+(`Analysis.Analyze`), zapisuje raport CSV do **`%TEMP%\wenta_pressure.csv`**
+i rysuje odcinki krytyczne jako polilinię o szerokości 40 mm na warstwie
+`WENTA-CRIT` (czyszczonej i rysowanej od nowa przy każdym uruchomieniu).
+Spadek na drodze krytycznej jest zapamiętywany w rysunku, więc kolejne
+uruchomienie podaje też zmianę względem poprzedniego, np.
+`previous run 4.43 Pa, change +3.57 Pa`.
+
+### 3.10 `WENTASIZE` — dobór wszystkich odcinków sieci
+
+Pyta o metodę i jej wartość docelową:
+
+| Metoda | Zapytanie (domyślnie) | Funkcja biblioteki |
+|---|---|---|
+| `Velocity` | prędkość docelowa (4,0 m/s) | `Sizing.VelocityMethod` |
+| `EqualFriction` | jednostkowy spadek ciśnienia (1,0 Pa/m) | `Sizing.EqualFrictionMethod` |
+| `Budget` | dopuszczalny spadek na odcinek (10 Pa) | `Sizing.PressureDropBudget` |
+| `Noise` | rodzaj pomieszczenia (`office`) | `Sizing.NoiseLimitMethod` |
+| `Aspect` | prędkość docelowa (4,0 m/s), proporcja boków (2,0) | `Sizing.AspectRatioMethod` (prostokątne) |
+
+oraz o kształt (domyślnie `Round` lub `Rectangular`). Solver rozprowadza
+strumienie terminali na wszystkie odcinki, `BatchSizing.Size` dobiera każdy
+odcinek i zaokrągla go do szeregu EN 1506 / EN 1505. Każda oś otrzymuje
+w znaczniku `WENTA` wymiar, strumień i prędkość oraz etykietę na warstwie
+`WENTA-LABEL`, np. `Ø200  0.100 m³/s  3.18 m/s`. Ponowne uruchomienie
+aktualizuje te same etykiety w miejscu (uchwyt etykiety jest zapisany
+w znaczniku) zamiast dodawać nowe. Na końcu podawany jest spadek ciśnienia na
+drodze krytycznej sieci po doborze.
+
+### 3.11 `WENTABALANCE` — nastawy przepustnic dla terminali
+
+Pyta o wysokość położenia, rozwiązuje sieć i wywołuje `ReFit.Hints`: dla
+każdego terminala nadwyżkę ciśnienia względem drogi krytycznej, współczynnik
+ζ przepustnicy, który ją zdławi, oraz stopień otwarcia przepustnicy
+jednopłaszczyznowej (`Balancing`, §4.9). Wartości są zapisywane w znacznikach
+terminali i w każdym znaczniku przepustnicy na odcinku zasilającym terminal
+bezpośrednio oraz pokazywane w ich etykietach
+(`T 0.060 m³/s  ζ=0.15 93% open`). Odgałęzienie, którego przepustnica
+musiałaby się całkowicie zamknąć, jest oznaczane `CHANGE HARDWARE` (mniejszy
+kanał, kryza lub inny typ przepustnicy). Zestawienie trafia do
+**`%TEMP%\wenta_balance.csv`**:
+
+```
+marker,class,terminal_id,run_id,available_dp_pa,required_dp_pa,surplus_dp_pa,damper_zeta,damper_open_percent,needs_hardware
+```
+
+### 3.12 Bezobsługowe sprawdzenie poleceń sieciowych
+
+`zwcad-plugin/network_test.scr` rysuje układ wzorcowy (magistrala 5 m od
+(0,0) do trójnika w (5000,0); przelot 3 m do terminala 0,06 m³/s;
+odgałęzienie 3 m do terminala 0,04 m³/s; przepustnica na odgałęzieniu)
+i uruchamia na nim wszystkie polecenia sieciowe. Najpierw trzeba wczytać
+wtyczkę (zainstalowaną lub przez `NETLOAD` w skrypcie opakowującym
+z `FILEDIA 0`). Zweryfikowano w ZWCAD 2021: `WENTATRACE` 4,43 Pa przy
+domyślnym Ø200; po `WENTASIZE` metodą prędkości 4 m/s (magistrala Ø200,
+przelot Ø150, odgałęzienie Ø125) 8,00 Pa, a drugie `WENTASIZE`
+zaktualizowało trzy etykiety, nie dodając nowych; `WENTABALANCE` ζ 0,15 /
+otwarcie 93 % dla terminala na przelocie, a odgałęzienie jest drogą krytyczną
+i jego przepustnica pozostaje całkowicie otwarta. Są to wartości, które
+`Wenta.Core` oblicza dla tego układu.
+
+### 3.13 Karta wstęgi „Wenta”
+
+Jeden panel z dziesięcioma dużymi przyciskami, każdy uruchamia jedno polecenie:
 
 | Przycisk | Polecenie |
 |---|---|
@@ -214,12 +330,16 @@ Jeden panel z pięcioma dużymi przyciskami, każdy uruchamia jedno polecenie:
 | Plugin Info | `WENTAHELLO` |
 | Fitting Catalog | `WENTACATALOG` |
 | BOM + KNR | `WENTABOM` |
+| Tag Marker | `WENTATAG` |
+| Trace Network | `WENTATRACE` |
+| Pressure Drop | `WENTAPRESSURE` |
+| Size Network | `WENTASIZE` |
+| Balance Dampers | `WENTABALANCE` |
 
-### 3.7 Plan rozwoju
+### 3.14 Plan rozwoju
 
-Polecenia takie jak `WENTATRACE`, `WENTASIZE`, `WENTAPRESSURE`, `WENTASOUND`,
-`WENTABALANCE`, `WENTAFAN`, `WENTAINSULATE` i `WENTAHELP` są planowane, nie
-zaimplementowane; część biblioteczna kilku z nich już istnieje (patrz §4).
+Polecenia takie jak `WENTASOUND`, `WENTAFAN`, `WENTAINSULATE`, `WENTAFITTING`,
+`WENTAREAD`/`WENTAWRITE` i `WENTAHELP` są planowane, nie zaimplementowane; część biblioteczna kilku z nich już istnieje (patrz §4).
 Plan znajduje się w `zwcad-plugin/ROADMAP.md` oraz w zgłoszeniach GitHub
 repozytorium `ModelTok/wenta`.
 
@@ -428,7 +548,12 @@ krytyczną co do bitu (testy: 7,63 Pa i 14,13 Pa).
 `TraceOptions.Diameters`/`Flows` (średnica domyślna 0,2 m). Wierzchołki
 stopnia ≥ 4 i pętle są odrzucane. `TracedSystem.Flatten()` zwraca odcinki
 `DuctSegment` do rysowania; `TotalLengthM()` sumuje długości łańcuchów.
-Odnogi trójnika są przypisywane w kolejności przechodzenia, nie wg geometrii.
+Odnogi trójnika są przypisywane w kolejności przechodzenia, nie wg geometrii,
+chyba że ustawiono `TraceOptions.StraightByDirection`: wtedy przelotem jest
+odcinek, który najlepiej przedłuża kierunek odcinka dopływowego (ustawiają to
+polecenia sieciowe, §3.6). `TraceOptions.SourceAt` wybiera jako źródło
+otwarty koniec najbliższy danemu punktowi, a `TraceOptions.Sections`
+nadpisuje przekrój odcinka.
 
 ### 4.17 Wykrywanie kolizji (`ClashDetection`)
 
@@ -574,13 +699,18 @@ Fakty o platformie ZWCAD 2021 zapisane w `zwcad-plugin/README.md`:
   `example-generic.json` obok DLL; `install.ps1` kopiuje go do
   `C:\ProgramData\WentaZwcad`.
 - **Co wtyczka faktycznie zrobiła?** Każde polecenie zapisuje wiersz do
-  `%TEMP%\wenta_zwcad_test.txt`; `WENTABOM` zapisuje `%TEMP%\wenta_bom.csv`.
+  `%TEMP%\wenta_zwcad_test.txt`; `WENTABOM` zapisuje `%TEMP%\wenta_bom.csv`,
+  `WENTATRACE` `wenta_trace.json`, `WENTAPRESSURE` `wenta_pressure.csv`,
+  a `WENTABALANCE` `wenta_balance.csv`, wszystkie w `%TEMP%`.
+- **`open duct end(s) without a terminal flow`.** Każdy otwarty koniec poza
+  źródłem wymaga znacznika terminala `WENTATAG` w promieniu 150 mm; komunikat
+  podaje położenia.
 - **Wyjątki.** W kodzie wtyczki `ZwSoft.ZwCAD.Runtime.Exception` przesłania
   `System.Exception`; błędy biblioteki to `Wenta.WentaException` z
   komunikatem wskazującym pole, plik lub element.
 - **Znane ograniczenie.** `WENTABOM` rozwiązuje wbudowaną sieć wzorcową,
-  a nie rysunek; odczyt sieci z rysunku to element planu rozwoju
-  (`WENTATRACE` / `WENTAREAD`).
+  a nie rysunek; narysowaną sieć odczytują `WENTATRACE` i pozostałe
+  polecenia sieciowe (§3.6).
 
 Zgłoszenia: <https://github.com/ModelTok/wenta/issues>. Dołącz wersję ZWCAD
 wypisaną przez `WENTAHELLO`, odpowiednie wiersze z

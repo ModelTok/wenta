@@ -38,6 +38,8 @@ if not exist "%OUT%" mkdir "%OUT%"
   "%SRC%\Commands.cs" ^
   "%SRC%\Plugin.cs" ^
   "%SRC%\WentaPanel.cs" ^
+  "%SRC%\CadIo.cs" ^
+  "%SRC%\NetworkCommands.cs" ^
   "%CORE%\Units.cs" ^
   "%CORE%\Fluid.cs" ^
   "%CORE%\Geometry.cs" ^
@@ -75,7 +77,8 @@ if not exist "%OUT%" mkdir "%OUT%"
   "%CORE%\IfcExport.cs" ^
   "%CORE%\MultiDrawing.cs" ^
   "%CORE%\ReFit.cs" ^
-  "%CORE%\QuickConnect.cs"
+  "%CORE%\QuickConnect.cs" ^
+  "%CORE%\DrawingModel.cs"
 
 if errorlevel 1 ( echo BUILD FAILED & exit /b 1 )
 

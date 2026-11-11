@@ -56,6 +56,7 @@ namespace Wenta.Core.Tests
             RunMultiDrawing();
             RunReFit();
             RunQuickConnect();
+            RunDrawing();
             RunPerformance();
 
             Console.WriteLine();
@@ -2318,6 +2319,247 @@ namespace Wenta.Core.Tests
                 net.Connect(prev, term);
             }
             return net;
+        }
+
+        private static DrawnDuct Dd(string handle, CrossSection section, params double[] xy)
+        {
+            var d = new DrawnDuct { Handle = handle, Section = section };
+            for (int i = 0; i + 1 < xy.Length; i += 2)
+                d.PointsMm.Add(new Point2(xy[i], xy[i + 1]));
+            return d;
+        }
+
+        private static DrawnMarker Mk(string handle, string cls, double x, double y, double flow)
+        {
+            return new DrawnMarker { Handle = handle, Class = cls, AtMm = new Point2(x, y), FlowM3s = flow };
+        }
+
+        // Reference floor-plan layout (mm), the one zwcad-plugin/network_test.scr
+        // draws: main 5 m Ø250 from the AHU end at (0,0) to a tee at (5000,0);
+        // straight run 3 m Ø200 to (8000,0) at 0.06 m³/s; branch 3 m Ø160 down
+        // to (5000,-3000) at 0.04 m³/s.
+        private static List<DrawnDuct> ReferenceDucts()
+        {
+            return new List<DrawnDuct>
+            {
+                Dd("A", new Round(0.25), 0, 0, 2500, 0, 5000, 0),
+                Dd("B", new Round(0.2), 5000, 0, 8000, 0),
+                Dd("C", new Round(0.16), 5000, 0, 5000, -3000),
+            };
+        }
+
+        private static List<DrawnMarker> ReferenceMarkers()
+        {
+            return new List<DrawnMarker>
+            {
+                Mk("S", WentaTag.ClassSource, 0, 0, 0),
+                Mk("T1", WentaTag.ClassTerminal, 8000, 30, 0.06),
+                Mk("T2", WentaTag.ClassTerminal, 5000, -3000, 0.04),
+                Mk("D2", WentaTag.ClassDamper, 5000, -2000, 0),
+            };
+        }
+
+        private static Network ReferenceHandBuilt()
+        {
+            var net = new Network { Name = "hand" };
+            net.Add("src", new Source("AHU"));
+            net.Add("main", new RigidDuct("main", new Round(0.25), 5.0));
+            net.Add("tee", new Tee("tee", new Round(0.25), 0.0, 0.5));
+            net.Add("straight", new RigidDuct("straight", new Round(0.2), 3.0));
+            net.Add("branch", new RigidDuct("branch", new Round(0.16), 3.0));
+            net.Add("t1", new Terminal("t1", 0.06, null, 0.0));
+            net.Add("t2", new Terminal("t2", 0.04, null, 0.0));
+            net.Connect("src", "main.inlet");
+            net.Connect("main.outlet", "tee.combined");
+            net.Connect("tee.straight", "straight.inlet");
+            net.Connect("tee.branch", "branch.inlet");
+            net.Connect("straight.outlet", "t1");
+            net.Connect("branch.outlet", "t2");
+            return net;
+        }
+
+        private static List<KeyValuePair<int, object>> Xd(params object[] codeValue)
+        {
+            var l = new List<KeyValuePair<int, object>>();
+            for (int i = 0; i + 1 < codeValue.Length; i += 2)
+                l.Add(new KeyValuePair<int, object>((int)codeValue[i], codeValue[i + 1]));
+            return l;
+        }
+
+        private static void RunDrawing()
+        {
+            // Topology plumbing used by the drawing adapter.
+            var srcOpts = new TraceOptions { SourceAt = new Point2(3.0, 1.0) };
+            TracedSystem rev = Topology.Trace(new List<Polyline>
+            {
+                Pl(0.0, 1.0, 2.0, 1.0), Pl(2.0, 1.0, 3.0, 1.0), Pl(2.0, 1.0, 2.0, 0.0),
+            }, srcOpts);
+            Check("drawing.topo_source_at_x", rev.SourcePoint.X, 3.0, 0.0);
+            CheckInt("drawing.topo_terminal_points", rev.TerminalPoints.Count, 2);
+            CheckInt("drawing.topo_tee_points", rev.TeePoints.Count, 1);
+            var secOpts = new TraceOptions();
+            secOpts.Sections["duct0"] = new Rectangular(0.4, 0.2);
+            TracedSystem rect = Topology.Trace(new List<Polyline> { Pl(0.0, 0.0, 5.0, 0.0) }, secOpts);
+            CheckTrue("drawing.topo_section_override",
+                ((RigidDuct)rect.Network.Components["duct0"]).CrossSection is Rectangular);
+
+            // WENTATRACE / WENTAPRESSURE: the drawn layout equals the hand-built network.
+            DrawingTrace tr = DrawingTrace.Build(ReferenceDucts(), ReferenceMarkers());
+            CheckInt("drawing.trace_chains", tr.System.Chains.Count, 3);
+            CheckInt("drawing.trace_components", tr.Network.Components.Count, 7);
+            CheckInt("drawing.trace_warnings", tr.Warnings.Count, 0);
+            CheckStr("drawing.trace_chain_A", tr.DuctChain["A"], "duct0");
+            CheckStr("drawing.trace_chain_B", tr.DuctChain["B"], "duct1");
+            CheckStr("drawing.trace_chain_C", tr.DuctChain["C"], "duct2");
+            CheckStr("drawing.trace_marker_T1", tr.MarkerTerminal["T1"], "term0");
+            CheckStr("drawing.trace_marker_T2", tr.MarkerTerminal["T2"], "term1");
+            CheckStr("drawing.trace_feeding_term1", tr.ChainFeeding("term1"), "duct2");
+            CheckStr("drawing.trace_damper_chain", tr.DamperChain["D2"], "duct2");
+            double drawnDp = tr.Network.Solve();
+            Network hand = ReferenceHandBuilt();
+            double handDp = hand.Solve();
+            CheckTrue("drawing.trace_equals_hand_built", Math.Abs(drawnDp - handDp) <= 1e-12);
+            Check("drawing.trace_source_flow",
+                tr.Network.Components["duct0"].InletFlowrate() ?? 0.0, 0.1, 1e-12);
+            PressureReport rep = PressureReport.Build(tr.Network);
+            PressureReport handRep = PressureReport.Build(hand);
+            CheckTrue("drawing.pressure_equals_hand_built", Math.Abs(rep.CriticalDpPa - handRep.CriticalDpPa) <= 1e-12);
+            List<string> crit = tr.CriticalChains(rep);
+            CheckTrue("drawing.pressure_critical_chains",
+                crit.Count == 2 && crit[0] == "duct0" && (crit[1] == "duct1" || crit[1] == "duct2"));
+            CheckStr("drawing.pressure_critical_matches_hand",
+                crit[1] == "duct1" ? "straight" : "branch",
+                handRep.Rows.Find(r => r.Kind == "RigidDuct" && r.ComponentId != "main").ComponentId);
+
+            // Drawing order and direction do not matter: the branch drawn first and
+            // every run drawn backwards still traces to the hand-built network (the
+            // straight leg is the run that continues the main's direction).
+            var reordered = new List<DrawnDuct>
+            {
+                Dd("C", new Round(0.16), 5000, -3000, 5000, 0),
+                Dd("B", new Round(0.2), 8000, 0, 5000, 0),
+                Dd("A", new Round(0.25), 5000, 0, 2500, 0, 0, 0),
+            };
+            DrawingTrace tro = DrawingTrace.Build(reordered, ReferenceMarkers());
+            CheckTrue("drawing.trace_order_independent", Math.Abs(tro.Network.Solve() - handDp) <= 1e-12);
+
+            // Source picked from the marker, not from drawing order.
+            var flipped = new List<DrawnMarker>
+            {
+                Mk("S", WentaTag.ClassSource, 8000, 0, 0),
+                Mk("T0", WentaTag.ClassTerminal, 0, 0, 0.05),
+                Mk("T2", WentaTag.ClassTerminal, 5000, -3000, 0.04),
+            };
+            DrawingTrace tf = DrawingTrace.Build(ReferenceDucts(), flipped);
+            tf.Network.Solve();
+            Check("drawing.trace_flipped_source_flow",
+                tf.Network.Components[tf.DuctChain["B"]].InletFlowrate() ?? 0.0, 0.09, 1e-12);
+
+            ExpectError(true, "drawing.trace_missing_flow_err", delegate
+            {
+                DrawingTrace.Build(ReferenceDucts(), new List<DrawnMarker> { Mk("S", WentaTag.ClassSource, 0, 0, 0) });
+            });
+            ExpectError(true, "drawing.trace_two_sources_err", delegate
+            {
+                var two = ReferenceMarkers();
+                two.Add(Mk("S2", WentaTag.ClassSource, 8000, 0, 0));
+                DrawingTrace.Build(ReferenceDucts(), two);
+            });
+            ExpectError(true, "drawing.trace_no_ducts_err", delegate
+            {
+                DrawingTrace.Build(new List<DrawnDuct>(), ReferenceMarkers());
+            });
+            var stray = ReferenceMarkers();
+            stray.Add(Mk("X", WentaTag.ClassTerminal, 99000, 99000, 0.5));
+            CheckInt("drawing.trace_stray_marker_warns", DrawingTrace.Build(ReferenceDucts(), stray).Warnings.Count, 1);
+            var mixed = ReferenceDucts();
+            mixed[0] = Dd("A1", new Round(0.25), 0, 0, 2500, 0);
+            mixed.Add(Dd("A2", new Round(0.315), 2500, 0, 5000, 0));
+            DrawingTrace tm = DrawingTrace.Build(mixed, ReferenceMarkers());
+            CheckInt("drawing.trace_mixed_size_warns", tm.Warnings.Count, 1);
+            CheckInt("drawing.trace_chain_handles", tm.ChainHandles["duct0"].Count, 2);
+
+            // WENTASIZE: per-run flows from the tagged terminals, EN snap, labels.
+            var tmpl = new BatchSizingRequest { Shape = Sizing.ShapeRound, Method = SizingMethod.Velocity, TargetVelocity = 4.0 };
+            List<ChainSizing> plan = DrawingSizing.Plan(DrawingTrace.Build(ReferenceDucts(), ReferenceMarkers()), tmpl);
+            CheckInt("drawing.size_rows", plan.Count, 3);
+            ChainSizing main = plan.Find(p => p.ChainId == "duct0");
+            Check("drawing.size_main_flow", main.FlowM3s, 0.1, 1e-12);
+            Check("drawing.size_main_snapped", ((Round)main.Snapped).Diameter, 0.2, 1e-12);
+            Check("drawing.size_main_velocity", main.VelocityMs, 0.1 / (Math.PI * 0.01), 1e-12);
+            CheckStr("drawing.size_main_label", main.Label, "Ø200  0.100 m³/s  3.18 m/s");
+            ChainSizing br = plan.Find(p => p.ChainId == "duct2");
+            Check("drawing.size_branch_flow", br.FlowM3s, 0.04, 1e-12);
+            CheckStr("drawing.size_branch_text", DrawingSizing.SizeText(br.Snapped),
+                "Ø" + Standards.NearestRoundSizeFor(Standard.En1505_1506,
+                    Math.Round(Math.Sqrt(4.0 * 0.04 / (Math.PI * 4.0)) * 1000.0, 3), true));
+            // Re-running on the sized drawing reproduces the same plan (update in place).
+            var resized = ReferenceDucts();
+            foreach (DrawnDuct d in resized)
+            {
+                string cid = d.Handle == "A" ? "duct0" : d.Handle == "B" ? "duct1" : "duct2";
+                d.Section = plan.Find(p => p.ChainId == cid).Snapped;
+            }
+            List<ChainSizing> again = DrawingSizing.Plan(DrawingTrace.Build(resized, ReferenceMarkers()), tmpl);
+            bool same = again.Count == plan.Count;
+            for (int i = 0; same && i < plan.Count; i++) same = again[i].Label == plan[i].Label;
+            CheckTrue("drawing.size_rerun_idempotent", same);
+            var rectTmpl = new BatchSizingRequest { Shape = Sizing.ShapeRectangular, Method = SizingMethod.AspectRatio, TargetVelocity = 4.0, AspectRatio = 2.0 };
+            ChainSizing rmain = DrawingSizing.Plan(DrawingTrace.Build(ReferenceDucts(), ReferenceMarkers()), rectTmpl).Find(p => p.ChainId == "duct0");
+            CheckTrue("drawing.size_rect_snapped", rmain.Snapped is Rectangular && rmain.Label.Contains("×"));
+
+            // WENTABALANCE: dampers inherit the ReFit hint of the terminal they feed.
+            DrawingTrace tb = DrawingTrace.Build(ReferenceDucts(), ReferenceMarkers());
+            tb.Network.Solve();
+            List<BalancingHint> hints = ReFit.Hints(tb.Network);
+            List<DamperSetting> dampers = DrawingBalancing.Dampers(tb, hints);
+            CheckInt("drawing.balance_dampers", dampers.Count, 1);
+            CheckStr("drawing.balance_damper_terminal", dampers[0].TerminalId, "term1");
+            BalancingHint h1 = hints.Find(x => x.TerminalId == "term1");
+            Check("drawing.balance_damper_zeta", dampers[0].Hint.DamperZeta, h1.DamperZeta, 0.0);
+            CheckTrue("drawing.balance_needs_hw_closed",
+                DrawingBalancing.NeedsHardware(new BalancingHint { SurplusDpPa = 5.0, DamperOpenPercent = 0.0 }));
+            CheckTrue("drawing.balance_no_hw_open",
+                !DrawingBalancing.NeedsHardware(new BalancingHint { SurplusDpPa = 5.0, DamperOpenPercent = 40.0 }));
+
+            // WENTASOUND: regenerated noise of the feeding run through the room equation.
+            List<RoomSound> rooms = DrawingSound.Rooms(DrawingTrace.Build(ReferenceDucts(), ReferenceMarkers()), "office", 60.0, 0.2);
+            CheckInt("drawing.sound_rooms", rooms.Count, 2);
+            RoomSound r2 = rooms.Find(x => x.TerminalId == "term1");
+            double v2 = 0.04 / (Math.PI * 0.08 * 0.08);
+            Check("drawing.sound_velocity", r2.VelocityMs, v2, 1e-12);
+            Check("drawing.sound_lp", r2.PressureLevelDb,
+                Sound.DuctPressureLevel(Sound.RegeneratedNoiseRound(v2, 0.16, 1.204), 60.0, 0.2), 1e-12);
+            CheckTrue("drawing.sound_worst_first",
+                rooms[0].PressureLevelDb - rooms[0].NcLimit >= rooms[1].PressureLevelDb - rooms[1].NcLimit);
+            ExpectError(true, "drawing.sound_bad_space_err", delegate
+            {
+                DrawingSound.Rooms(DrawingTrace.Build(ReferenceDucts(), ReferenceMarkers()), "hangar", 60.0, 0.2);
+            });
+
+            // Entity tags (#22): v2 round trip and the legacy WENTADUCT record.
+            WentaTag tag = WentaTag.New(WentaTag.ClassDuct);
+            tag.SetSection(new Rectangular(0.4, 0.2));
+            tag.Set("flow_m3s", 0.15);
+            List<KeyValuePair<int, object>> xd = tag.ToXData();
+            xd.Insert(0, new KeyValuePair<int, object>(1001, WentaTag.AppName));
+            WentaTag back = WentaTag.FromXData(xd);
+            CheckStr("drawing.tag_class", back.Class, "duct");
+            CheckStr("drawing.tag_guid", back.Guid, tag.Guid);
+            Guid parsed;
+            CheckTrue("drawing.tag_guid_format", Guid.TryParse(back.Guid, out parsed));
+            Check("drawing.tag_flow", back.GetDouble("flow_m3s") ?? 0.0, 0.15, 0.0);
+            CheckTrue("drawing.tag_section", back.Section() is Rectangular && ((Rectangular)back.Section()).Width == 0.4);
+            CheckTrue("drawing.tag_not_legacy", !back.Legacy);
+            WentaTag legacy = WentaTag.FromXData(Xd(1001, "WENTA", 1000, "duct", 1040, 0.15, 1040, 3.75, 1070, 0, 1000, "400×200 mm"));
+            CheckTrue("drawing.tag_legacy", legacy.Legacy && legacy.Guid == null);
+            Check("drawing.tag_legacy_w", legacy.GetDouble("w_mm") ?? 0.0, 400.0, 0.0);
+            Check("drawing.tag_legacy_h", legacy.GetDouble("h_mm") ?? 0.0, 200.0, 0.0);
+            WentaTag legacyRound = WentaTag.FromXData(Xd(1000, "duct", 1040, 0.1, 1040, 3.1, 1070, 1, 1000, "Ø200 mm"));
+            Check("drawing.tag_legacy_round", ((Round)legacyRound.Section()).Diameter, 0.2, 1e-12);
+            CheckTrue("drawing.tag_foreign_app", WentaTag.FromXData(Xd(1001, "OTHER", 1000, "duct")) == null);
+            CheckTrue("drawing.tag_empty", WentaTag.FromXData(Xd()) == null);
+            CheckTrue("drawing.tag_bad_label", WentaTag.ParseSizeLabel("abc") == null);
         }
 
         private static void RunPerformance()

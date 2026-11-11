@@ -14,13 +14,19 @@ Mojo, Rust or WASM at runtime.
 | `WENTABOM` | Solves the reference tee network (critical path 7.63 Pa — parity-vector value) and exports the BOM + KNR rows to `%TEMP%\wenta_bom.csv` |
 | `WENTAPANEL` | Opens the dockable sizing palette: flow/velocity/shape in, live section preview, one-click `WENTADUCT` |
 | `WENTAHELLO` | Version/info banner + evidence log |
+| `WENTATAG` | Places or edits a terminal (with design flow), source or damper marker: circle on `WENTA-TAG` + label, v2 `WENTA` tag with a GUID |
+| `WENTATRACE` | Builds the network from the drawn centrelines (LINE / LWPOLYLINE / ARC) and markers via `DrawingTrace`, prints runs/tees/terminals and the critical-path ΔP, saves `%TEMP%\wenta_trace.json` |
+| `WENTAPRESSURE` | Critical-path `PressureReport` + per-component table at a site altitude, `%TEMP%\wenta_pressure.csv`, `WENTA-CRIT` overlay, change since the previous run |
+| `WENTASIZE` | Sizes every run (Velocity / EqualFriction / Budget / Noise / Aspect, round or rectangular) via `DrawingSizing`, writes the tag and updates the `WENTA-LABEL` labels in place |
+| `WENTABALANCE` | Damper ζ / opening per terminal (`ReFit.Hints`, `DrawingBalancing`), written to the markers and their labels, `CHANGE HARDWARE` flag, `%TEMP%\wenta_balance.csv` |
 
 ## UI
 
 - **Ribbon tab "Wenta"** — partial CUIX (`Wenta.CUIX`, built by
   `tools/MakeCuix.cs`, modeled 1:1 on ZWSOFT's own `APP+.cuix` package format).
   Buttons: Duct Section · Wenta Panel · Plugin Info · Fitting Catalog ·
-  BOM + KNR. Load once with `MENULOAD`; verified live in the ZWCAD UI tree
+  BOM + KNR · Tag Marker · Trace Network · Pressure Drop · Size Network ·
+  Balance Dampers. Load once with `MENULOAD`; verified live in the ZWCAD UI tree
   (`Wenta [ControlType.TabItem]`, see `uia-check.ps1`).
 - **Palette** — no longer auto-opens at startup (user preference: ribbon);
   `WENTAPANEL` / ribbon button opens it on demand.
@@ -44,6 +50,13 @@ WENTABOM ok  7 rows  7,63 Pa
 WENTAHELLO ok  ZWCAD 21.10.21.0
 ```
 
+Network commands (`network_test.scr`, plugin loaded first): draws a 5 m
+main, a tee, a 3 m straight run and a 3 m branch, tags them and runs every
+network command. Verified on ZWCAD 2021: trace 4.43 Pa at the default Ø200,
+sized (velocity 4 m/s → Ø200 / Ø150 / Ø125) 8.00 Pa, a second `WENTASIZE`
+updates the three labels in place, balance ζ 0.15 / 93 % open on the
+straight-run terminal — the values `Wenta.Core` computes for the layout.
+
 ## ZWCAD platform facts (hard-won, keep)
 
 - Managed API = `ZwManaged.dll` (acmgd) + `ZwDatabaseMgd.dll` (acdbmgd),
@@ -62,11 +75,11 @@ WENTAHELLO ok  ZWCAD 21.10.21.0
 ## Repo map
 
 ```
-WentaZwcad/        plugin sources (Commands, Plugin, WentaPanel)
+WentaZwcad/        plugin sources (Commands, Plugin, WentaPanel, NetworkCommands, CadIo)
 ../csharp/         Wenta.Core + test suite (frozen vectors) + catalogs
 tools/MakeCuix.cs  CUIX ribbon package builder
 build.cmd install.ps1 uninstall.ps1   build & deploy
-load_test.scr full_test.scr autoload_test.scr   headless test scripts
+load_test.scr full_test.scr autoload_test.scr network_test.scr   headless test scripts
 uia-check.ps1      UI-tree verification (ribbon tab presence)
 ROADMAP.md         the plan (C#-first, UX phase, PL-market items)
 ```

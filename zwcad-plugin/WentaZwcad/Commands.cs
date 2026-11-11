@@ -13,7 +13,6 @@ namespace WentaZwcad
     public class Commands
     {
         private const string LogFile = "wenta_zwcad_test.txt";
-        private const string XDataApp = "WENTA";
 
         [CommandMethod("WENTAHELLO")]
         public void Hello()
@@ -112,7 +111,7 @@ namespace WentaZwcad
                 ms.AppendEntity(text);
                 tr.AddNewlyCreatedDBObject(text, true);
 
-                AttachXData(tr, db, outline, flow, r.Velocity, round ? 1 : 0, label);
+                AttachXData(tr, db, outline, flow, r.Velocity, r.Section);
 
                 tr.Commit();
             }
@@ -206,7 +205,7 @@ namespace WentaZwcad
             return Wenta.Losses.StraightPressureDrop(f, 1.0, s.HydraulicDiameter, v, air.Density);
         }
 
-        private static void Log(string message)
+        internal static void Log(string message)
         {
             try
             {
@@ -217,24 +216,18 @@ namespace WentaZwcad
             catch (System.Exception) { }
         }
 
+        // v2 WENTA tag (class, GUID, key/value pairs, see Wenta.WentaTag);
+        // geometry=section marks the drawn cross-section outline so
+        // WENTATRACE does not mistake it for a centreline.
         private static void AttachXData(Transaction tr, Database db, Entity e,
-            double flow, double velocity, int shapeCode, string sizeLabel)
+            double flow, double velocity, Wenta.CrossSection section)
         {
-            RegAppTable rat = (RegAppTable)tr.GetObject(db.RegAppTableId, OpenMode.ForWrite);
-            if (!rat.Has(XDataApp))
-            {
-                var ra = new RegAppTableRecord();
-                ra.Name = XDataApp;
-                rat.Add(ra);
-                tr.AddNewlyCreatedDBObject(ra, true);
-            }
-            e.XData = new ResultBuffer(
-                new TypedValue(1001, XDataApp),
-                new TypedValue(1000, "duct"),
-                new TypedValue(1040, flow),
-                new TypedValue(1040, velocity),
-                new TypedValue(1070, shapeCode),
-                new TypedValue(1000, sizeLabel));
+            Wenta.WentaTag tag = Wenta.WentaTag.New(Wenta.WentaTag.ClassDuct);
+            tag.Set("geometry", "section");
+            tag.SetSection(section);
+            tag.Set("flow_m3s", flow);
+            tag.Set("velocity_ms", velocity);
+            CadIo.WriteTag(tr, db, e, tag);
         }
     }
 }

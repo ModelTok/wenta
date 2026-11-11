@@ -20,6 +20,14 @@ namespace Wenta
         public double DefaultDiameter = 0.2;
         public Dictionary<string, double> Diameters = new Dictionary<string, double>();
         public Dictionary<string, double> Flows = new Dictionary<string, double>();
+        public Dictionary<string, CrossSection> Sections = new Dictionary<string, CrossSection>();
+        public Point2? SourceAt;
+        public bool TeeSectionFromUpstream;
+        // When set, the tee's straight leg is the downstream run that best
+        // continues the direction of the incoming run (drawing order no
+        // longer matters); otherwise the first run in chain order is
+        // straight, as in venti::topology.
+        public bool StraightByDirection;
     }
 
     public sealed class Chain
@@ -42,6 +50,9 @@ namespace Wenta
     {
         public readonly Network Network;
         public readonly List<Chain> Chains;
+        public Point2 SourcePoint;
+        public readonly Dictionary<string, Point2> TerminalPoints = new Dictionary<string, Point2>();
+        public readonly Dictionary<string, Point2> TeePoints = new Dictionary<string, Point2>();
 
         public TracedSystem(Network network, List<Chain> chains)
         {
@@ -108,6 +119,20 @@ namespace Wenta
             public bool Equals(GridKey other) { return X == other.X && Y == other.Y; }
             public override bool Equals(object obj) { return obj is GridKey && Equals((GridKey)obj); }
             public override int GetHashCode() { unchecked { return (int)(X * 397 ^ Y); } }
+        }
+
+        // Unit direction of a chain at junction vertex jv: flowing into jv
+        // when incoming, flowing out of jv otherwise.
+        private static Point2 EndDirection(Chain ch, IntPair ends, int jv, bool incoming)
+        {
+            List<Point2> p = ch.Points;
+            Point2 a, b;
+            if (ends.B == jv) { a = p[p.Count - 2]; b = p[p.Count - 1]; }
+            else { a = p[1]; b = p[0]; }
+            double dx = b.X - a.X, dy = b.Y - a.Y;
+            if (!incoming) { dx = -dx; dy = -dy; }
+            double len = Math.Sqrt(dx * dx + dy * dy);
+            return len > 0.0 ? new Point2(dx / len, dy / len) : new Point2(0.0, 0.0);
         }
 
         private static readonly Comparison<IntPair> ByChainIndex =
@@ -217,6 +242,15 @@ namespace Wenta
             if (ends.Count < 2)
                 throw new WentaException("a network needs at least one source and one terminal end");
             int sourceV = ends[0];
+            if (opts.SourceAt.HasValue)
+            {
+                double best = double.PositiveInfinity;
+                foreach (int e in ends)
+                {
+                    double d2 = verts[e].Point.DistanceSquaredTo(opts.SourceAt.Value);
+                    if (d2 < best) { best = d2; sourceV = e; }
+                }
+            }
 
             List<Chain> chains = new List<Chain>();
             List<IntPair> chainEnds = new List<IntPair>();
@@ -293,6 +327,25 @@ namespace Wenta
                 foreach (IntPair inc in incident)
                     if (inc.A != cameIn) downstream.Add(inc);
                 downstream.Sort(ByChainIndex);
+                if (opts.StraightByDirection && cameIn != -1 && downstream.Count > 1)
+                {
+                    Point2 inDir = EndDirection(chains[cameIn], chainEnds[cameIn], jv, true);
+                    int best = 0;
+                    double bestCos = double.NegativeInfinity;
+                    for (int k = 0; k < downstream.Count; k++)
+                    {
+                        int dc = downstream[k].A;
+                        Point2 outDir = EndDirection(chains[dc], chainEnds[dc], jv, false);
+                        double cos = inDir.X * outDir.X + inDir.Y * outDir.Y;
+                        if (cos > bestCos + 1e-12) { bestCos = cos; best = k; }
+                    }
+                    if (best != 0)
+                    {
+                        IntPair straight = downstream[best];
+                        downstream.RemoveAt(best);
+                        downstream.Insert(0, straight);
+                    }
+                }
 
                 for (int k = 0; k < downstream.Count; k++)
                 {
@@ -342,7 +395,16 @@ namespace Wenta
                 {
                     string t = "tee" + teeOf.Count;
                     teeOf[i] = t;
-                    Round r = new Round(opts.DefaultDiameter);
+                    CrossSection r = new Round(opts.DefaultDiameter);
+                    if (opts.TeeSectionFromUpstream)
+                    {
+                        foreach (KeyValuePair<int, IntPair> kv in dir)
+                        {
+                            if (kv.Value.B != i) continue;
+                            r = ChainSection(chains[kv.Key], opts);
+                            break;
+                        }
+                    }
                     net.Add(t, new Tee(t, r, 0.0, 0.5));
                 }
             }
@@ -355,8 +417,8 @@ namespace Wenta
                     throw new WentaException("chain direction missing");
                 int up = d.A, down = d.B;
 
-                Round rd = new Round(ch.Diameter);
-                net.Add(ch.Id, new RigidDuct(ch.Id, rd, ch.LengthM, RigidDuct.DefaultAbsoluteRoughness));
+                net.Add(ch.Id, new RigidDuct(ch.Id, ChainSection(ch, opts), ch.LengthM,
+                    RigidDuct.DefaultAbsoluteRoughness));
 
                 string ductIn = ch.Id + ".inlet";
                 string ductOut = ch.Id + ".outlet";
@@ -391,7 +453,21 @@ namespace Wenta
                     throw new WentaException("downstream end resolved to the source (invalid tree)");
             }
 
-            return new TracedSystem(net, chains);
+            TracedSystem traced = new TracedSystem(net, chains);
+            traced.SourcePoint = verts[sourceV].Point;
+            foreach (KeyValuePair<int, string> kv in terminalOf)
+                traced.TerminalPoints[kv.Value] = verts[kv.Key].Point;
+            foreach (KeyValuePair<int, string> kv in teeOf)
+                traced.TeePoints[kv.Value] = verts[kv.Key].Point;
+            return traced;
+        }
+
+        private static CrossSection ChainSection(Chain ch, TraceOptions opts)
+        {
+            CrossSection section;
+            if (opts.Sections.TryGetValue(ch.Id, out section) && section != null)
+                return section;
+            return new Round(ch.Diameter);
         }
     }
 }
