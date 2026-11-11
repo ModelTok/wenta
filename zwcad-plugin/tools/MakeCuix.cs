@@ -350,6 +350,16 @@ namespace WentaZwcad.Tools
         <LargeImage Name=""wenta_info_32.png"" />
       </Macro>
     </MenuMacro>
+    <MenuMacro UID=""WENTA_ATTEN"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_ATTEN_NM"">Attenuators</Name>
+        <Command>^C^C_.WENTAATTEN</Command>
+        <HelpString xlate=""true"" UID=""WENTA_ATTEN_HS"">Select and insert an attenuator for every room over its NC limit: WENTAATTEN</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_panel_32.png"" />
+      </Macro>
+    </MenuMacro>
     <MenuMacro UID=""WENTA_HELP"">
       <Macro type=""Any"">
         <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
@@ -433,6 +443,10 @@ namespace WentaZwcad.Tools
         </RibbonCommandButton>
         <RibbonCommandButton UID=""WENTA_RBTN_READ"" Id=""ZwRibbonCommandButton"" Text=""Read Network"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_READ"" KeyTip="""">
           <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_READ_TT"">Read Network</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_ATTEN"" Id=""ZwRibbonCommandButton"" Text=""Attenuators"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_ATTEN"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_ATTEN_TT"">Attenuators</TooltipTitle>
           <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
         </RibbonCommandButton>
         <RibbonCommandButton UID=""WENTA_RBTN_HELP"" Id=""ZwRibbonCommandButton"" Text=""Wenta Help"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_HELP"" KeyTip="""">

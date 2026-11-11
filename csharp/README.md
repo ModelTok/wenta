@@ -23,6 +23,7 @@ Wenta.Core/           pure C# library (compiles standalone, net48-compatible)
   Results.cs Analysis.cs PressureReport.cs Marking.cs Balancing.cs Room.cs
   Sound.cs Fan.cs FanCatalog.cs Insulation.cs Electrical.cs Fabrication.cs Development.cs
   Clash.cs Topology.cs IfcExport.cs NetworkJson.cs NetworkDrawing.cs Settings.cs
+  Attenuators.cs Markdown.cs
 Wenta.Core.Tests/     console test runner (Program.cs, no xUnit needed)
   vectors/            CSV parity vectors (frozen golden fixtures, see below)
 catalogs/             open ζ-catalog format: FORMAT.md (spec) + example-generic,
@@ -89,6 +90,15 @@ Two kinds of assertions, both in `Wenta.Core.Tests/Program.cs`:
   `WENTAREAD`: lays a network out to scale (or reuses its stored layout),
   builds each entity's tag record, and reads tagged entities back into a
   network, refusing orphaned tags, copied GUIDs and inconsistent records.
+- **`Attenuators.cs`** — the attenuator catalog JSON (`AttenuatorCatalog`,
+  example `catalogs/example-attenuators.json`, fictional) and
+  `AttenuatorSelection` for `WENTAATTEN`: room sound per terminal net of
+  existing attenuators, lowest-ζ pick that covers the excess, splice in
+  front of the terminal, re-solve.
+- **`Markdown.cs`** — a small Markdown → HTML converter (headings with
+  ids and a table of contents, lists, fences, pipe tables; raw HTML is
+  escaped) used at build time to turn the user guides into the HTML help
+  `WENTAHELP` opens.
 
 The ZWCAD plugin (`../zwcad-plugin`) compiles every file in `Wenta.Core/`
 into its own DLL — keep `zwcad-plugin/build.cmd`'s file list in sync with

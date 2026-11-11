@@ -2,9 +2,9 @@
 <!--
   WentaZwcad MSI (issue #36).
 
-  Packages the three files install.ps1 deploys - WentaZwcad.dll (Wenta.Core
-  compiled in), Wenta.CUIX and example-generic.json - into
-  C:\ProgramData\WentaZwcad, and writes the HKLM demand-load registration
+  Packages what install.ps1 deploys - WentaZwcad.dll (Wenta.Core compiled
+  in), Wenta.CUIX, the example catalogs (generic zeta, fans, attenuators)
+  and the HTML user guides - into C:\ProgramData\WentaZwcad, and writes the HKLM demand-load registration
   ZWCAD 2021 needs (LOADCTRLS=14, MANAGED=1). Uninstall removes both.
 
   The ribbon still has to be loaded once per ZWCAD profile with
@@ -81,6 +81,24 @@
 
       <Component Id="ExampleCatalog" Guid="5a17d93e-8f42-4c06-9b8a-4d7e1f6b03c5">
         <File Id="ExampleGenericJson" Source="$(var.BinDir)\example-generic.json" KeyPath="yes" />
+      </Component>
+
+      <!-- WENTAFAN and WENTAATTEN look for their example catalogs beside the DLL. -->
+      <Component Id="ExampleFans" Guid="c41e7a20-93d5-4b6f-8a1c-5e02d7f9b318">
+        <File Id="ExampleFansJson" Source="$(var.BinDir)\example-fans.json" KeyPath="yes" />
+      </Component>
+
+      <Component Id="ExampleAttenuators" Guid="8d2b5f61-0e47-4a93-b6c8-71f3a9e4d205">
+        <File Id="ExampleAttenuatorsJson" Source="$(var.BinDir)\example-attenuators.json" KeyPath="yes" />
+      </Component>
+
+      <!-- WENTAHELP opens these (generated from docs/user-guide.*.md by zwcad-plugin\build.cmd). -->
+      <Component Id="UserGuideEn" Guid="2f6c9e83-5a1d-4c07-9e4b-b8d03f17a652">
+        <File Id="UserGuideEnHtml" Source="$(var.BinDir)\user-guide.en.html" KeyPath="yes" />
+      </Component>
+
+      <Component Id="UserGuidePl" Guid="e7a40b19-6c3f-4d82-a5e1-0f9b2c86d374">
+        <File Id="UserGuidePlHtml" Source="$(var.BinDir)\user-guide.pl.html" KeyPath="yes" />
       </Component>
 
       <!-- wenta.log lives beside the plugin; remove it on uninstall so nothing is left behind. -->

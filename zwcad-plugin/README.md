@@ -22,9 +22,10 @@ Mojo, Rust or WASM at runtime.
 | `WENTAFAN` | Duty point (terminal flow, critical ΔP + extra) against a fan-curve catalog JSON (`example-fans.json`); lists every fan with margin and power, picks the first that meets it (`Fan.PickFan`), writes it to the source marker |
 | `WENTAINSULATE` | EN ISO 12241 thickness (condensation or heat-loss limit) for each sized round run via `DrawingInsulation`, snapped to the standard step; tag + label on `WENTA-INSUL`, updated in place |
 | `WENTASOUND` | Regenerated noise of the run feeding each terminal through the room equation against the space type's NC limit (`DrawingSound`); worst room first, terminal tags, `%TEMP%\wenta_sound.csv` |
+| `WENTAATTEN` | For every room over its limit, picks the lowest-ζ attenuator of the feeding run's diameter that covers the excess from a catalog JSON (`example-attenuators.json`, fictional), splices it in front of the terminal, re-solves and draws it (`AttenuatorSelection`); `%TEMP%\wenta_atten.csv` / `.json` |
 | `WENTAWRITE` | Draws a network JSON to scale (ducts as polylines on `WENTA-DUCT`, other components as circles, labels on `WENTA-ANNO`), each entity tagged with its full component record (`NetworkDrawing`); a second run updates the entities in place |
 | `WENTAREAD` | Reads the tagged entities back to a network JSON (design shape), taking edited drawn lengths; refuses orphaned tags, copied GUIDs, class mismatches and missing values |
-| `WENTAHELP` | Command list and the paths of the EN/PL user guides; optionally opens one |
+| `WENTAHELP` | Command list and the paths of the EN/PL user guides; optionally opens one as HTML (built from the Markdown by `tools/MakeHelp.cs`) |
 
 ## UI
 
@@ -32,7 +33,7 @@ Mojo, Rust or WASM at runtime.
   `tools/MakeCuix.cs`, modeled 1:1 on ZWSOFT's own `APP+.cuix` package format).
   Buttons: Duct Section · Wenta Panel · Plugin Info · Fitting Catalog ·
   BOM + KNR · Tag Marker · Trace Network · Pressure Drop · Size Network ·
-  Balance Dampers · Select Fan · Insulate · Room Sound · Draw Network ·
+  Balance Dampers · Select Fan · Insulate · Room Sound · Attenuators · Draw Network ·
   Read Network · Wenta Help. Load once with `MENULOAD`; verified live in the ZWCAD UI tree
   (`Wenta [ControlType.TabItem]`, see `uia-check.ps1`).
 - **Palette** — no longer auto-opens at startup (user preference: ribbon);
@@ -67,7 +68,9 @@ straight-run terminal; then `WENTAFAN` with 150 Pa extra picks
 every run and updates its labels on the second run, `WENTASOUND` and
 `WENTAHELP` run, and the `WENTAWRITE`/`WENTAREAD` round trip reproduces
 4.43 Pa with byte-identical JSON on the second read, refuses orphaned tags
-and picks up an edited duct length (5.14 Pa) — the values `Wenta.Core` computes for the layout.
+and picks up an edited duct length (5.14 Pa); last, `WENTAATTEN` (studio)
+inserts and draws two attenuators, no room stays over the limit, and ΔP
+goes from 5.14 to 6.84 Pa, which `WENTAREAD` reads back — the values `Wenta.Core` computes for the layout.
 
 ## ZWCAD platform facts (hard-won, keep)
 

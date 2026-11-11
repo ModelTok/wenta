@@ -115,3 +115,10 @@ _.WENTAREAD
 _.WENTAWRITE
 %TEMP%\wenta_read3.json
 
+_.WENTAATTEN
+studio
+50
+0.2
+
+_.WENTAREAD
+%TEMP%\wenta_read4.json

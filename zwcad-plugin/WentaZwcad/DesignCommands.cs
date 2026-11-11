@@ -301,6 +301,7 @@ namespace WentaZwcad
             new[] { "WENTASOUND", "regenerated noise per room against the NC limit" },
             new[] { "WENTAWRITE", "draw a network JSON to scale, re-writes update in place" },
             new[] { "WENTAREAD", "read the drawn network back to JSON, refusing bad tags" },
+            new[] { "WENTAATTEN", "attenuator per room over its NC limit, inserted and solved" },
             new[] { "WENTAHELLO", "version banner" },
             new[] { "WENTAHELP", "this list and the user guide" },
         };
@@ -314,8 +315,10 @@ namespace WentaZwcad
             ed.WriteMessage("\nWenta commands:");
             foreach (string[] c in CommandList)
                 ed.WriteMessage(string.Format("\n  {0,-14} {1}", c[0], c[1]));
-            string en = Path.Combine(PluginDir(), "user-guide.en.md");
-            string pl = Path.Combine(PluginDir(), "user-guide.pl.md");
+            // The HTML guides are generated from docs/user-guide.*.md by
+            // build.cmd (tools/MakeHelp.cs); the Markdown is the fallback.
+            string en = Guide("en");
+            string pl = Guide("pl");
             ed.WriteMessage("\nUser guide: " + en + "\nPodręcznik: " + pl);
             string open = CadIo.PromptKeyword(ed, "\nOpen the user guide [English/Polski/No] <No>: ", "No",
                 "English", "Polski", "No");
@@ -333,7 +336,13 @@ namespace WentaZwcad
                 }
             }
             Commands.Log(string.Format(C, "WENTAHELP ok  {0} commands  guide {1}", CommandList.Length,
-                File.Exists(en) ? "present" : "missing"));
+                !File.Exists(en) ? "missing" : en.EndsWith(".html", StringComparison.OrdinalIgnoreCase) ? "html" : "md"));
+        }
+
+        private static string Guide(string lang)
+        {
+            string html = Path.Combine(PluginDir(), "user-guide." + lang + ".html");
+            return File.Exists(html) ? html : Path.Combine(PluginDir(), "user-guide." + lang + ".md");
         }
     }
 }
