@@ -309,6 +309,19 @@ Last, `WENTAATTEN` (studio, 50 m², α 0.2, the example catalog) puts
 `ExampleAtten EA-200-1200` and `EA-200-600` in front of the two
 terminals, leaves no room over the limit and raises ΔP from 5.14 to
 6.84 Pa; `WENTAREAD` then reads 9 components and 6.84 Pa.
+The editing commands follow on the same drawing: `WENTAPROPS` `duct1`
+diameter 270 is snapped up to Ø300 (6.84 → 6.12 Pa), `WENTASTRETCH`
+`duct1` to 4 m moves the attenuator and terminal at its end (6.16 Pa),
+`WENTAMOVE` `tee0` by (0, −500) lengthens the three joined ducts
+(6.17 Pa) and `WENTAPROPS` `term0` flow 0.05 m³/s gives 7.22 Pa;
+`WENTAREAD` then reads the 9 components with no length edits, 7.22 Pa,
+and every GUID unchanged. Last, the drawing is erased,
+`example-dampers-network.json` is drawn at (0,−40000) and `WENTAREFIT`
+`t1` 0.2 m³/s (velocity 4 m/s) re-sizes the main and the straight run
+feeding it from Ø250 / Ø200 to Ø300 (the tee and damper `dS` follow, the
+branch to `t2` keeps Ø160), sets `dS` to ζ 0.05 with the branch damper
+`dB` open, and takes 2.59 → 3.70 Pa with no residual imbalance in about
+6 ms; `WENTAREAD` reads 3.70 Pa back with no edits.
 
 ### 3.13 `WENTAFAN` — fan at the duty point
 
@@ -423,9 +436,63 @@ single-number room level of §4.10; there are no octave-band data,
 breakout or propagation along the ductwork, so treat it as a first check.
 The units in `example-attenuators.json` are invented.
 
-### 3.19 Ribbon tab "Wenta"
+### 3.19 `WENTAPROPS` / `WENTAMOVE` / `WENTASTRETCH` — editing the drawn network
 
-One panel with seventeen large buttons, each running one command:
+These three commands work on the network drawn by `WENTAWRITE` (§3.17).
+Each reads every component record in model space as `WENTAREAD` does and
+refuses, naming the first problem, when the drawing does not validate.
+Each asks for a component id (Enter, then pick the entity, takes the id
+from its tag), makes the edit in `Wenta.NetworkEdit`, solves the network
+before and after, and redraws the records **in place**: the same
+entities, GUIDs and XData, with the new lengths, sizes and labels, so
+the identity of every component survives the edit and a following
+`WENTAREAD` finds no length edits. The message gives the components
+changed and the critical-path ΔP before and after.
+
+- **`WENTAPROPS`** lists the component's properties (diameter or width
+  and height in mm, length in m, flow in m³/s, ζ) and the flow it
+  carries, then edits one of them. A diameter is snapped up to the next
+  EN 1506 size (`StandardSizes.NearestRoundSize`, the message says so);
+  widths and heights are taken as given; a flow is set on a terminal and
+  propagates upstream; a length is a stretch (below). A property the
+  component does not have (a length on a terminal, a flow on a duct) or a
+  negative ζ is refused.
+- **`WENTASTRETCH`** gives a duct a new length: the last vertex moves
+  along the last segment and every component downstream moves by the
+  same vector, so the drawing stays connected. A shortening that would
+  remove the last segment is refused.
+- **`WENTAMOVE`** moves a point component (tee, fitting, damper,
+  attenuator, terminal, source) by a displacement in mm. The ends of the
+  ducts joined to it follow, and those ducts take their new drawn length.
+  Ducts themselves are not moved; stretch them or move the components at
+  their ends.
+
+### 3.20 `WENTAREFIT` — new terminal flow, re-size and re-balance
+
+Prompts: the terminal, its new flow (m³/s), and the sizing method
+`[Velocity/EqualFriction]` with its target. In one command it sets the
+flow, opens every damper (a two-port fitting whose record has role
+`damper`), re-sizes the affected legs (the ducts between the source and
+that terminal) for their new flow with the `WENTASIZE` methods
+(`ReFit.Apply`; the other runs carry the same flow and keep their size),
+lets a tee or in-line fitting that had the section of the duct feeding it
+take the duct's new section, solves the network, and
+sets the damper on the run feeding each terminal to the ζ that brings the
+terminal's path up to the critical one (`Balancing.BalancingZeta` at the
+damper's own velocity; the damper on the critical path stays open). The
+records are redrawn in place, so the new ζ is in each damper's tag. It
+lists the re-sized ducts (old and new diameter and velocity), each
+damper's ζ and opening, and any terminal with a surplus but no damper
+(with the ζ a damper there would need). The message gives ΔP before and
+after, the residual imbalance over the terminals that have a damper and
+the time taken; the network is also saved to
+**`%TEMP%\wenta_refit.json`**. `example-dampers-network.json`, next to
+the DLL, is the reference network with a damper on each run; a bare file
+name that `WENTAWRITE` does not find is looked up there.
+
+### 3.21 Ribbon tab "Wenta"
+
+One panel with twenty-one large buttons, each running one command:
 
 | Button | Command |
 |---|---|
@@ -445,9 +512,13 @@ One panel with seventeen large buttons, each running one command:
 | Attenuators | `WENTAATTEN` |
 | Draw Network | `WENTAWRITE` |
 | Read Network | `WENTAREAD` |
+| Edit Properties | `WENTAPROPS` |
+| Move Component | `WENTAMOVE` |
+| Stretch Duct | `WENTASTRETCH` |
+| Re-fit Flow | `WENTAREFIT` |
 | Wenta Help | `WENTAHELP` |
 
-### 3.20 Roadmap
+### 3.22 Roadmap
 
 Commands such as `WENTAFITTING`
 are planned, not implemented; the library half of several of them already exists (see §4).

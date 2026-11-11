@@ -63,6 +63,8 @@ namespace Wenta.Core.Tests
             RunNetworkDrawing();
             RunMarkdown(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "docs"));
             RunAttenuators(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "catalogs"));
+            RunSolverVentiSemantics();
+            RunNetworkEdit();
             RunPerformance();
 
             Console.WriteLine();
@@ -2363,6 +2365,261 @@ namespace Wenta.Core.Tests
                 Mk("T2", WentaTag.ClassTerminal, 5000, -3000, 0.04),
                 Mk("D2", WentaTag.ClassDamper, 5000, -2000, 0),
             };
+        }
+
+        // #27 prerequisite: Wenta.Core solver semantics against the tested
+        // behaviour of venti::network (legacy venti/src/network/solver.rs:
+        // multi_source_separate_demands_and_dp,
+        // multi_source_merged_total_demand_and_dp,
+        // cycle_detection_and_solve_error, large_chain_solves_fast,
+        // empty_network_edge_cases_do_not_panic).
+        private static void RunSolverVentiSemantics()
+        {
+            var r = new Round(0.2);
+            var sep = new Network { Name = "two-source-separate" };
+            sep.Add("s1", new Source("S1"));
+            sep.Add("s2", new Source("S2"));
+            sep.Add("d1", new RigidDuct("d1", r, 5.0, 0.0001));
+            sep.Add("d2", new RigidDuct("d2", r, 5.0, 0.0001));
+            sep.Add("t1", new Terminal("t1", 0.1, r, 1.0));
+            sep.Add("t2", new Terminal("t2", 0.2, r, 1.0));
+            sep.Connect("s1", "d1"); sep.Connect("d1", "t1");
+            sep.Connect("s2", "d2"); sep.Connect("d2", "t2");
+            double dpSep = sep.Solve();
+            Check("solver.venti_separate_s1", sep.Components["s1"].Ports[0].Flowrate.Value, 0.1, 1e-12);
+            Check("solver.venti_separate_s2", sep.Components["s2"].Ports[0].Flowrate.Value, 0.2, 1e-12);
+            CheckTrue("solver.venti_separate_dp", dpSep > 0.0);
+
+            var mg = new Network { Name = "two-source-merged" };
+            mg.Add("s1", new Source("S1"));
+            mg.Add("s2", new Source("S2"));
+            mg.Add("d1", new RigidDuct("d1", r, 5.0, 0.0001));
+            mg.Add("d2", new RigidDuct("d2", r, 5.0, 0.0001));
+            mg.Add("common", new RigidDuct("common", r, 5.0, 0.0001));
+            mg.Add("tee", new Tee("tee", r, 0.1, 0.2));
+            mg.Add("t1", new Terminal("t1", 0.1, r, 1.0));
+            mg.Add("t2", new Terminal("t2", 0.2, r, 1.0));
+            mg.Connect("s1", "d1"); mg.Connect("s2", "d2");
+            mg.Connect("d1", "common"); mg.Connect("d2", "common");
+            mg.Connect("common", "tee.combined");
+            mg.Connect("tee.straight", "t1"); mg.Connect("tee.branch", "t2");
+            double dpMg = mg.Solve();
+            Check("solver.venti_merged_s1_total", mg.Components["s1"].Ports[0].Flowrate.Value, 0.3, 1e-12);
+            Check("solver.venti_merged_s2_total", mg.Components["s2"].Ports[0].Flowrate.Value, 0.3, 1e-12);
+            Check("solver.venti_merged_t1", mg.Components["t1"].Ports[0].Flowrate.Value, 0.1, 1e-12);
+            Check("solver.venti_merged_t2", mg.Components["t2"].Ports[0].Flowrate.Value, 0.2, 1e-12);
+            CheckTrue("solver.venti_merged_dp", dpMg > 0.0);
+
+            var cyc = new Network { Name = "cyclic" };
+            cyc.Add("s", new Source("AHU"));
+            cyc.Add("d0", new RigidDuct("d0", r, 5.0, 0.0001));
+            cyc.Add("d1", new RigidDuct("d1", r, 5.0, 0.0001));
+            cyc.Add("t", new Terminal("t", 0.1, r, 1.0));
+            cyc.Connect("s", "d0"); cyc.Connect("d0", "d1"); cyc.Connect("d1", "t"); cyc.Connect("d1", "d0");
+            string topoErr = null, solveErr = null;
+            try { cyc.TopoOrder(); } catch (WentaException e) { topoErr = e.Message; }
+            try { cyc.Solve(); } catch (WentaException e) { solveErr = e.Message; }
+            CheckTrue("solver.venti_cycle_topo", topoErr != null && topoErr.Contains("cycle"));
+            CheckTrue("solver.venti_cycle_solve", solveErr != null && solveErr.Contains("cycle"));
+
+            var big = new Network { Name = "large" };
+            big.Add("src", new Source("AHU"));
+            for (int i = 0; i < 2000; i++) big.Add("d" + i.ToString(C), new RigidDuct("d" + i.ToString(C), r, 1.0, 0.0001));
+            big.Add("term", new Terminal("term", 0.1, r, 1.0));
+            big.Connect("src", "d0");
+            for (int i = 0; i < 1999; i++) big.Connect("d" + i.ToString(C), "d" + (i + 1).ToString(C));
+            big.Connect("d1999", "term");
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            double dpBig = big.Solve();
+            sw.Stop();
+            CheckTrue("solver.venti_large_chain_dp", dpBig > 0.0);
+            Check("solver.venti_large_chain_sum", dpBig,
+                2000.0 * big.Components["d0"].Ports[0].PressureDrop + big.Components["term"].Ports[0].PressureDrop, 1e-9);
+            CheckTrue("solver.venti_large_chain_fast", sw.Elapsed.TotalMilliseconds < 1000.0);
+
+            foreach (string kind in new[] { "source-only", "terminal-only" })
+            {
+                var e = new Network { Name = kind };
+                if (kind == "source-only") e.Add("s", new Source("AHU"));
+                else e.Add("t", new Terminal("t", 0.1, r, 1.0));
+                bool ok = true;
+                try { e.Solve(); }
+                catch (WentaException) { }
+                catch (Exception) { ok = false; }
+                CheckTrue("solver.venti_" + kind + "_no_crash", ok);
+            }
+        }
+
+        // #23 / #27: NetworkEdit on the reference network with its layout.
+        private static void RunNetworkEdit()
+        {
+            Network net = ReferenceHandBuilt();
+            var meta = new Dictionary<string, ComponentMeta>();
+            NetworkDrawing.Write(net, meta, new Point2(0.0, 0.0), new List<string>());
+            string guidT1 = meta["t1"].Guid;
+            double dp0 = ReferenceHandBuilt().Solve();
+
+            // Properties.
+            Check("edit.get_diameter", NetworkEdit.Get(net.Components["branch"], "diameter").Value, 160.0, 1e-12);
+            Check("edit.get_length", NetworkEdit.Get(net.Components["branch"], "length").Value, 3.0, 1e-15);
+            Check("edit.get_flow", NetworkEdit.Get(net.Components["t1"], "flow").Value, 0.06, 1e-15);
+            CheckTrue("edit.get_none", NetworkEdit.Get(net.Components["tee"], "length") == null);
+
+            EditResult d = NetworkEdit.Set(net, meta, "branch", "diameter", 170.0);
+            Check("edit.diameter_snapped", ((Round)((RigidDuct)d.Network.Components["branch"]).CrossSection).Diameter, 0.2, 1e-15);
+            CheckTrue("edit.diameter_note", d.Note != null && d.Note.Contains("Ø200"));
+            Network h1 = ReferenceHandBuilt();
+            h1 = NetworkEdit.Rebuild(h1, new Dictionary<string, Component> { { "branch", new RigidDuct("branch", new Round(0.2), 3.0) } });
+            Check("edit.diameter_dp", d.CriticalAfterPa, h1.Solve(), 1e-12);
+            Check("edit.before_dp", d.CriticalBeforePa, dp0, 1e-12);
+            CheckStr("edit.original_untouched", DrawingSizing.SizeText(((RigidDuct)net.Components["branch"]).CrossSection), "Ø160");
+
+            EditResult f = NetworkEdit.Set(net, meta, "t1", "flow", 0.08);
+            var h2 = NetworkEdit.Rebuild(ReferenceHandBuilt(), new Dictionary<string, Component> { { "t1", new Terminal("t1", 0.08, null, 0.0) } });
+            Check("edit.flow_dp", f.CriticalAfterPa, h2.Solve(), 1e-12);
+            Check("edit.flow_main_carries", f.Network.Components["main"].InletFlowrate().Value, 0.12, 1e-12);
+
+            EditResult z = NetworkEdit.Set(net, meta, "t2", "zeta", 1.5);
+            Check("edit.zeta_set", ((Terminal)z.Network.Components["t2"]).Zeta, 1.5, 1e-15);
+
+            ExpectError(true, "edit.err_length_on_terminal", () => NetworkEdit.Set(net, meta, "t1", "length", 2.0));
+            ExpectError(true, "edit.err_flow_on_duct", () => NetworkEdit.Set(net, meta, "main", "flow", 0.1));
+            ExpectError(true, "edit.err_negative_zeta", () => NetworkEdit.Set(net, meta, "t1", "zeta", -1.0));
+            ExpectError(true, "edit.err_unknown_property", () => NetworkEdit.Set(net, meta, "t1", "colour", 1.0));
+            ExpectError(true, "edit.err_unknown_component", () => NetworkEdit.Set(net, meta, "nope", "flow", 1.0));
+            ExpectError(true, "edit.err_width_on_round", () => NetworkEdit.Set(net, meta, "main", "width", 300.0));
+
+            // Stretch: the duct's end and everything downstream move.
+            EditResult s = NetworkEdit.Stretch(net, meta, "straight", 4.0);
+            Check("edit.stretch_layout", NetworkDrawing.PolylineLengthMm(s.Meta["straight"].LayoutMm), 4000.0, 1e-9);
+            Check("edit.stretch_t1_x", s.Meta["t1"].AtMm.Value.X, meta["t1"].AtMm.Value.X + 1000.0, 1e-9);
+            Check("edit.stretch_tee_fixed", s.Meta["tee"].AtMm.Value.X, meta["tee"].AtMm.Value.X, 1e-12);
+            Check("edit.stretch_original_layout", NetworkDrawing.PolylineLengthMm(meta["straight"].LayoutMm), 3000.0, 1e-9);
+            var h3 = NetworkEdit.Rebuild(ReferenceHandBuilt(), new Dictionary<string, Component> { { "straight", new RigidDuct("straight", new Round(0.2), 4.0) } });
+            Check("edit.stretch_dp", s.CriticalAfterPa, h3.Solve(), 1e-12);
+            CheckInt("edit.stretch_changed", s.Changed.Count, 2);
+            EditResult viaSet = NetworkEdit.Set(net, meta, "straight", "length", 4.0);
+            Check("edit.set_length_is_stretch", viaSet.CriticalAfterPa, s.CriticalAfterPa, 1e-15);
+            ExpectError(true, "edit.err_stretch_too_short", () => NetworkEdit.Stretch(net, meta, "straight", 0.0002));
+            ExpectError(true, "edit.err_stretch_terminal", () => NetworkEdit.Stretch(net, meta, "t1", 2.0));
+
+            // Consistent tags: drawing the edited network and reading it back
+            // finds no length edits, the same network and the same GUIDs.
+            NetworkReadResult back = RoundTrip(s.Network, s.Meta);
+            CheckTrue("edit.stretch_reads_back", back.Ok);
+            CheckInt("edit.stretch_no_length_edits", back.LengthUpdated.Count, 0);
+            Check("edit.stretch_read_dp", back.Network.Solve(), s.CriticalAfterPa, 1e-12);
+            CheckStr("edit.stretch_guid_kept", back.Meta["t1"].Guid, guidT1);
+
+            // Move: the joined ducts' ends follow and take the drawn length.
+            EditResult mv = NetworkEdit.Move(net, meta, "tee", 0.0, -500.0);
+            Check("edit.move_main_len", ((RigidDuct)mv.Network.Components["main"]).Length, Math.Sqrt(5.0 * 5.0 + 0.5 * 0.5), 1e-12);
+            double straightLen = NetworkDrawing.PolylineLengthMm(mv.Meta["straight"].LayoutMm) / 1000.0;
+            Check("edit.move_straight_len", ((RigidDuct)mv.Network.Components["straight"]).Length, straightLen, 1e-15);
+            Check("edit.move_straight_geom", straightLen, Math.Sqrt(3.0 * 3.0 + 0.5 * 0.5), 1e-12);
+            Check("edit.move_branch_len", ((RigidDuct)mv.Network.Components["branch"]).Length, 3.5, 1e-12);
+            CheckInt("edit.move_changed", mv.Changed.Count, 4);
+            NetworkReadResult mvBack = RoundTrip(mv.Network, mv.Meta);
+            CheckTrue("edit.move_reads_back", mvBack.Ok && mvBack.LengthUpdated.Count == 0);
+            Check("edit.move_read_dp", mvBack.Network.Solve(), mv.CriticalAfterPa, 1e-12);
+            EditResult mt = NetworkEdit.Move(net, meta, "t1", 1000.0, 0.0);
+            Check("edit.move_terminal_len", ((RigidDuct)mt.Network.Components["straight"]).Length, 4.0, 1e-12);
+            Check("edit.move_terminal_same_as_stretch", mt.CriticalAfterPa, s.CriticalAfterPa, 1e-12);
+            ExpectError(true, "edit.err_move_duct", () => NetworkEdit.Move(net, meta, "main", 10.0, 0.0));
+            ExpectError(true, "edit.err_move_collapse", () => NetworkEdit.Move(net, meta, "t1", -3000.0, 0.0));
+            ExpectError(true, "edit.err_no_layout", () => NetworkEdit.Move(ReferenceHandBuilt(), new Dictionary<string, ComponentMeta>(), "t1", 1.0, 0.0));
+
+            // Downstream walk.
+            List<string> downTee = NetworkEdit.Downstream(net, "tee"); downTee.Sort(StringComparer.Ordinal);
+            CheckStr("edit.downstream_tee", string.Join(",", downTee.ToArray()), "branch,straight,t1,t2");
+            CheckInt("edit.downstream_terminal", NetworkEdit.Downstream(net, "t1").Count, 0);
+
+            // #27 re-fit: one terminal's flow, re-size, re-balance.
+            Network dn = DamperNetwork(5.0);
+            var dmeta = new Dictionary<string, ComponentMeta>();
+            dmeta["dS"] = new ComponentMeta { Role = NetworkEdit.RoleDamper };
+            dmeta["dB"] = new ComponentMeta { Role = NetworkEdit.RoleDamper };
+            NetworkDrawing.Write(dn, dmeta, new Point2(0.0, 0.0), new List<string>());
+            CheckStr("refit.damper_feeding_t1", NetworkEdit.DamperFeeding(dn, dmeta, "t1"), "dS");
+            CheckStr("refit.damper_feeding_t2", NetworkEdit.DamperFeeding(dn, dmeta, "t2"), "dB");
+            CheckTrue("refit.no_damper_without_role", NetworkEdit.DamperFeeding(dn, new Dictionary<string, ComponentMeta>(), "t1") == null);
+
+            var opt = new ReFitOptions { Method = SizingMethod.Velocity, TargetVelocity = 4.0 };
+            ReFlowResult rf = NetworkEdit.ReFlow(dn, dmeta, "t1", 0.2, opt);
+            Check("refit.old_flow", rf.OldFlowM3s, 0.06, 1e-15);
+            Check("refit.new_flow", ((Terminal)rf.Network.Components["t1"]).Flowrate, 0.2, 1e-15);
+            CheckTrue("refit.resized_some", rf.Resized.Count > 0);
+            // The legs feeding t1 take ReFit.Apply's sizes for the new flow;
+            // the branch to t2 carries the same flow and keeps its size.
+            Network manual = NetworkEdit.Rebuild(DamperNetwork(0.0), new Dictionary<string, Component> { { "t1", new Terminal("t1", 0.2, null, 0.0) } });
+            ReFitResult mfit = ReFit.Apply(manual, opt);
+            var up1 = new List<string>(NetworkEdit.Upstream(dn, "t1")); up1.Sort(StringComparer.Ordinal);
+            CheckStr("refit.affected", string.Join(",", up1.ToArray()), "dS,main,src,straight,tee");
+            CheckStr("refit.branch_kept", DrawingSizing.SizeText(((RigidDuct)rf.Network.Components["branch"]).CrossSection), "Ø160");
+            CheckStr("refit.straight_up", DrawingSizing.SizeText(((RigidDuct)rf.Network.Components["straight"]).CrossSection), "Ø300");
+            CheckInt("refit.resized_two", rf.Resized.Count, 2);
+            CheckStr("refit.tee_follows_main", DrawingSizing.SizeText(((Tee)rf.Network.Components["tee"]).CrossSection), "Ø300");
+            foreach (string duct in new[] { "main", "straight" })
+                CheckTrue("refit.size_" + duct, NetworkEdit.SameSection(
+                    ((RigidDuct)rf.Network.Components[duct]).CrossSection, ((RigidDuct)mfit.Network.Components[duct]).CrossSection));
+            CheckTrue("refit.damper_follows_duct", NetworkEdit.SameSection(
+                ((TwoPortFitting)rf.Network.Components["dS"]).CrossSection, ((RigidDuct)rf.Network.Components["straight"]).CrossSection));
+            CheckInt("refit.dampers_set", rf.Dampers.Count, 2);
+            int open = 0;
+            foreach (DamperSettingResult ds in rf.Dampers) if (ds.Zeta == 0.0) open++;
+            CheckInt("refit.one_damper_open", open, 1);
+            CheckTrue("refit.balanced", rf.ResidualSurplusPa < 1e-9);
+            List<BalancingHint> after = ReFit.Hints(rf.Network);
+            Check("refit.paths_equal", after[0].AvailableDpPa, after[1].AvailableDpPa, 1e-9);
+            Check("refit.critical_reported", rf.CriticalAfterPa, rf.Network.Solve(), 1e-12);
+            CheckTrue("refit.fast", rf.ElapsedMs < 200.0);
+            ReFlowResult rf0 = NetworkEdit.ReFlow(DamperNetwork(0.0), dmeta, "t1", 0.2, opt);
+            Check("refit.ignores_old_damper_setting", rf0.CriticalAfterPa, rf.CriticalAfterPa, 1e-12);
+            NetworkReadResult rfBack = RoundTrip(rf.Network, rf.Meta);
+            CheckTrue("refit.reads_back", rfBack.Ok && rfBack.LengthUpdated.Count == 0);
+            Check("refit.read_dp", rfBack.Network.Solve(), rf.CriticalAfterPa, 1e-12);
+            ExpectError(true, "refit.err_not_terminal", () => NetworkEdit.ReFlow(dn, dmeta, "main", 0.1, opt));
+            ExpectError(true, "refit.err_zero_flow", () => NetworkEdit.ReFlow(dn, dmeta, "t1", 0.0, opt));
+            // The shipped example (zwcad-plugin headless test) is this network.
+            Dictionary<string, ComponentMeta> exMeta;
+            Network ex = NetworkJson.Load(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "examples", "example-dampers-network.json"), out exMeta);
+            Check("refit.example_dp", ex.Solve(), DamperNetwork(0.0).Solve(), 1e-12);
+            CheckStr("refit.example_damper_role", NetworkEdit.DamperFeeding(ex, exMeta, "t2"), "dB");
+            ReFlowResult rfx = NetworkEdit.ReFlow(ex, exMeta, "t1", 0.2, opt);
+            Check("refit.example_same", rfx.CriticalAfterPa, rf.CriticalAfterPa, 1e-12);
+        }
+
+        // Reference network with a damper on each run, the branch damper at ζ.
+        private static Network DamperNetwork(double zetaB)
+        {
+            var net = new Network { Name = "dampers" };
+            net.Add("src", new Source("AHU"));
+            net.Add("main", new RigidDuct("main", new Round(0.25), 5.0));
+            net.Add("tee", new Tee("tee", new Round(0.25), 0.0, 0.5));
+            net.Add("straight", new RigidDuct("straight", new Round(0.2), 3.0));
+            net.Add("dS", new TwoPortFitting("dS", new Round(0.2), 0.0));
+            net.Add("t1", new Terminal("t1", 0.06, null, 0.0));
+            net.Add("branch", new RigidDuct("branch", new Round(0.16), 3.0));
+            net.Add("dB", new TwoPortFitting("dB", new Round(0.16), zetaB));
+            net.Add("t2", new Terminal("t2", 0.04, null, 0.0));
+            net.Connect("src", "main.inlet");
+            net.Connect("main.outlet", "tee.combined");
+            net.Connect("tee.straight", "straight.inlet");
+            net.Connect("straight.outlet", "dS.inlet");
+            net.Connect("dS.outlet", "t1");
+            net.Connect("tee.branch", "branch.inlet");
+            net.Connect("branch.outlet", "dB.inlet");
+            net.Connect("dB.outlet", "t2");
+            return net;
+        }
+
+        // Write the network as records, then read the records back.
+        private static NetworkReadResult RoundTrip(Network net, Dictionary<string, ComponentMeta> meta)
+        {
+            List<DrawnComponent> items = NetworkDrawing.Write(net, meta, new Point2(0.0, 0.0), new List<string>());
+            int n = 0;
+            foreach (DrawnComponent dc in items) dc.Handle = "H" + (n++).ToString(C);
+            return NetworkDrawing.Read(items, net.Name);
         }
 
         private static Network ReferenceHandBuilt()

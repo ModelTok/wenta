@@ -302,6 +302,10 @@ namespace WentaZwcad
             new[] { "WENTAWRITE", "draw a network JSON to scale, re-writes update in place" },
             new[] { "WENTAREAD", "read the drawn network back to JSON, refusing bad tags" },
             new[] { "WENTAATTEN", "attenuator per room over its NC limit, inserted and solved" },
+            new[] { "WENTAPROPS", "show and edit a drawn component's size, length, flow or zeta" },
+            new[] { "WENTAMOVE", "move a drawn tee, fitting or terminal; joined ducts follow" },
+            new[] { "WENTASTRETCH", "new length for a drawn duct; downstream moves with it" },
+            new[] { "WENTAREFIT", "new terminal flow: re-size, re-solve and re-set dampers" },
             new[] { "WENTAHELLO", "version banner" },
             new[] { "WENTAHELP", "this list and the user guide" },
         };

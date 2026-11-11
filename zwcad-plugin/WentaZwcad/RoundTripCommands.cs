@@ -49,6 +49,10 @@ namespace WentaZwcad
             Editor ed = doc.Editor;
             string path = PromptPath(ed, "\nNetwork JSON to draw", DefaultJson());
             if (path == null) return;
+            // A bare file name not found here may be one of the examples
+            // shipped next to the plugin (example-dampers-network.json).
+            if (!File.Exists(path) && !Path.IsPathRooted(path) && File.Exists(Path.Combine(PluginDir(), path)))
+                path = Path.Combine(PluginDir(), path);
 
             var po = new PromptPointOptions("\nBase point for a new layout <0,0>: ") { AllowNone = true };
             PromptPointResult pr = ed.GetPoint(po);
@@ -255,7 +259,7 @@ namespace WentaZwcad
         // Draws the items, updating earlier records in place (matched by
         // GUID, then by scope and id); counts records of the same scopes
         // that the items no longer contain.
-        private static void Draw(Document doc, List<DrawnComponent> items, out int created, out int updated, out int stale)
+        internal static void Draw(Document doc, List<DrawnComponent> items, out int created, out int updated, out int stale)
         {
             created = 0; updated = 0; stale = 0;
             Database db = doc.Database;
@@ -337,7 +341,7 @@ namespace WentaZwcad
         }
 
         // Every WENTA-tagged entity of model space, with its geometry.
-        private static List<DrawnComponent> Scan(Database db, Dictionary<string, ObjectId> ids)
+        internal static List<DrawnComponent> Scan(Database db, Dictionary<string, ObjectId> ids)
         {
             var items = new List<DrawnComponent>();
             using (Transaction tr = db.TransactionManager.StartTransaction())

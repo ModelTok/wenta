@@ -360,6 +360,46 @@ namespace WentaZwcad.Tools
         <LargeImage Name=""wenta_panel_32.png"" />
       </Macro>
     </MenuMacro>
+    <MenuMacro UID=""WENTA_PROPS"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_PROPS_NM"">Edit Properties</Name>
+        <Command>^C^C_.WENTAPROPS</Command>
+        <HelpString xlate=""true"" UID=""WENTA_PROPS_HS"">Show and edit one component's size, length, flow or zeta; re-solved and redrawn in place: WENTAPROPS</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_info_32.png"" />
+      </Macro>
+    </MenuMacro>
+    <MenuMacro UID=""WENTA_MOVE"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_MOVE_NM"">Move Component</Name>
+        <Command>^C^C_.WENTAMOVE</Command>
+        <HelpString xlate=""true"" UID=""WENTA_MOVE_HS"">Move a tee, fitting or terminal; the joined ducts follow and take the drawn length: WENTAMOVE</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_duct_32.png"" />
+      </Macro>
+    </MenuMacro>
+    <MenuMacro UID=""WENTA_STRETCH"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_STRETCH_NM"">Stretch Duct</Name>
+        <Command>^C^C_.WENTASTRETCH</Command>
+        <HelpString xlate=""true"" UID=""WENTA_STRETCH_HS"">Give a duct a new length; everything downstream moves with it: WENTASTRETCH</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_duct_32.png"" />
+      </Macro>
+    </MenuMacro>
+    <MenuMacro UID=""WENTA_REFIT"">
+      <Macro type=""Any"">
+        <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        <Name xlate=""true"" UID=""WENTA_REFIT_NM"">Re-fit Flow</Name>
+        <Command>^C^C_.WENTAREFIT</Command>
+        <HelpString xlate=""true"" UID=""WENTA_REFIT_HS"">Change one terminal flow, re-size the ducts feeding it and re-set the dampers in one step: WENTAREFIT</HelpString>
+        <SmallImage Name="""" />
+        <LargeImage Name=""wenta_panel_32.png"" />
+      </Macro>
+    </MenuMacro>
     <MenuMacro UID=""WENTA_HELP"">
       <Macro type=""Any"">
         <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
@@ -447,6 +487,22 @@ namespace WentaZwcad.Tools
         </RibbonCommandButton>
         <RibbonCommandButton UID=""WENTA_RBTN_ATTEN"" Id=""ZwRibbonCommandButton"" Text=""Attenuators"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_ATTEN"" KeyTip="""">
           <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_ATTEN_TT"">Attenuators</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_PROPS"" Id=""ZwRibbonCommandButton"" Text=""Edit Properties"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_PROPS"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_PROPS_TT"">Edit Properties</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_MOVE"" Id=""ZwRibbonCommandButton"" Text=""Move Component"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_MOVE"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_MOVE_TT"">Move Component</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_STRETCH"" Id=""ZwRibbonCommandButton"" Text=""Stretch Duct"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_STRETCH"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_STRETCH_TT"">Stretch Duct</TooltipTitle>
+          <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
+        </RibbonCommandButton>
+        <RibbonCommandButton UID=""WENTA_RBTN_REFIT"" Id=""ZwRibbonCommandButton"" Text=""Re-fit Flow"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_REFIT"" KeyTip="""">
+          <TooltipTitle xlate=""true"" UID=""WENTA_RBTN_REFIT_TT"">Re-fit Flow</TooltipTitle>
           <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
         </RibbonCommandButton>
         <RibbonCommandButton UID=""WENTA_RBTN_HELP"" Id=""ZwRibbonCommandButton"" Text=""Wenta Help"" ButtonStyle=""LargeWithText"" MenuMacroID=""WENTA_HELP"" KeyTip="""">

@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "name": "example-dampers",
+  "components": {
+    "src": {
+      "type": "Source",
+      "name": "AHU"
+    },
+    "main": {
+      "type": "RigidDuct",
+      "name": "main",
+      "cross_section": {
+        "shape": "round",
+        "diameter": 0.25
+      },
+      "length": 5,
+      "absolute_roughness": 0.0001
+    },
+    "tee": {
+      "type": "Tee",
+      "name": "tee",
+      "cross_section": {
+        "shape": "round",
+        "diameter": 0.25
+      },
+      "zeta_straight": 0,
+      "zeta_branch": 0.5
+    },
+    "straight": {
+      "type": "RigidDuct",
+      "name": "straight",
+      "cross_section": {
+        "shape": "round",
+        "diameter": 0.2
+      },
+      "length": 3,
+      "absolute_roughness": 0.0001
+    },
+    "dS": {
+      "type": "TwoPortFitting",
+      "name": "damper dS",
+      "role": "damper",
+      "cross_section": {
+        "shape": "round",
+        "diameter": 0.2
+      },
+      "zeta": 0
+    },
+    "t1": {
+      "type": "Terminal",
+      "name": "t1",
+      "flowrate": 0.06,
+      "zeta": 0
+    },
+    "branch": {
+      "type": "RigidDuct",
+      "name": "branch",
+      "cross_section": {
+        "shape": "round",
+        "diameter": 0.16
+      },
+      "length": 3,
+      "absolute_roughness": 0.0001
+    },
+    "dB": {
+      "type": "TwoPortFitting",
+      "name": "damper dB",
+      "role": "damper",
+      "cross_section": {
+        "shape": "round",
+        "diameter": 0.16
+      },
+      "zeta": 0
+    },
+    "t2": {
+      "type": "Terminal",
+      "name": "t2",
+      "flowrate": 0.04,
+      "zeta": 0
+    }
+  },
+  "connections": [
+    {
+      "source": "src:outlet",
+      "target": "main:inlet"
+    },
+    {
+      "source": "main:outlet",
+      "target": "tee:combined"
+    },
+    {
+      "source": "tee:straight",
+      "target": "straight:inlet"
+    },
+    {
+      "source": "straight:outlet",
+      "target": "dS:inlet"
+    },
+    {
+      "source": "dS:outlet",
+      "target": "t1:inlet"
+    },
+    {
+      "source": "tee:branch",
+      "target": "branch:inlet"
+    },
+    {
+      "source": "branch:outlet",
+      "target": "dB:inlet"
+    },
+    {
+      "source": "dB:outlet",
+      "target": "t2:inlet"
+    }
+  ]
+}
