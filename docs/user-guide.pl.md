@@ -340,11 +340,12 @@ przewody (6,17 Pa), a `WENTAPROPS` `term0` przepływ 0,05 m³/s daje
 7,22 Pa; `WENTAREAD` odczytuje następnie 9 elementów bez zmian długości,
 7,22 Pa, z niezmienionymi GUID. Na końcu rysunek jest czyszczony,
 `example-dampers-network.json` zostaje narysowany w (0,−40000), a
-`WENTAREFIT` `t1` 0,12 m³/s (prędkość 4 m/s) zmniejsza odgałęzienie do
-Ø125, ustawia przepustnicę przelotu `dS` na ζ 0,14 przy otwartej
-przepustnicy odgałęzienia `dB` i zmienia ΔP z 2,59 na 6,98 Pa bez
-pozostałego niezrównoważenia w około 6 ms; `WENTAREAD` odczytuje 6,98 Pa
-bez zmian.
+`WENTAREFIT` `t1` 0,2 m³/s (prędkość 4 m/s) zwiększa przewód główny i
+zasilający go przelot z Ø250 / Ø200 do Ø300 (trójnik i przepustnica `dS`
+podążają za nimi, odgałęzienie do `t2` zachowuje Ø160), ustawia `dS` na
+ζ 0,05 przy otwartej przepustnicy odgałęzienia `dB` i zmienia ΔP z 2,59
+na 3,70 Pa bez pozostałego niezrównoważenia w około 6 ms; `WENTAREAD`
+odczytuje 3,70 Pa bez zmian.
 
 ### 3.13 `WENTAFAN` — wentylator w punkcie pracy
 
@@ -504,9 +505,11 @@ przed i po zmianie.
 Zapytania: terminal, jego nowy przepływ (m³/s) oraz metoda doboru
 `[Velocity/EqualFriction]` z wartością docelową. W jednym poleceniu
 ustawia przepływ, otwiera wszystkie przepustnice (kształtki
-dwuportowe, których rekord ma rolę `damper`), dobiera każdy przewód do
-jego nowego przepływu metodami `WENTASIZE` (`ReFit.Apply`), nadaje
-kształtce w linii, która miała przekrój przewodu ją zasilającego, nowy
+dwuportowe, których rekord ma rolę `damper`), dobiera na nowo
+przewody, których to dotyczy (między źródłem a tym terminalem), do ich
+nowego przepływu metodami `WENTASIZE` (`ReFit.Apply`; pozostałe gałęzie
+prowadzą ten sam przepływ i zachowują wymiar), nadaje trójnikowi lub
+kształtce w linii, które miały przekrój zasilającego je przewodu, nowy
 przekrój tego przewodu, oblicza sieć i ustawia przepustnicę na gałęzi
 zasilającej każdy terminal na ζ, które wyrównuje ścieżkę terminala do
 ścieżki krytycznej (`Balancing.BalancingZeta` przy prędkości w samej

@@ -395,7 +395,7 @@ namespace WentaZwcad.Tools
         <ModifiedRev MajorVersion=""0"" MinorVersion=""0"" UserVersion=""0"" />
         <Name xlate=""true"" UID=""WENTA_REFIT_NM"">Re-fit Flow</Name>
         <Command>^C^C_.WENTAREFIT</Command>
-        <HelpString xlate=""true"" UID=""WENTA_REFIT_HS"">Change one terminal flow, re-size the ducts and re-set the dampers in one step: WENTAREFIT</HelpString>
+        <HelpString xlate=""true"" UID=""WENTA_REFIT_HS"">Change one terminal flow, re-size the ducts feeding it and re-set the dampers in one step: WENTAREFIT</HelpString>
         <SmallImage Name="""" />
         <LargeImage Name=""wenta_panel_32.png"" />
       </Macro>

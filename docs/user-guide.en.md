@@ -317,10 +317,11 @@ diameter 270 is snapped up to Ø300 (6.84 → 6.12 Pa), `WENTASTRETCH`
 `WENTAREAD` then reads the 9 components with no length edits, 7.22 Pa,
 and every GUID unchanged. Last, the drawing is erased,
 `example-dampers-network.json` is drawn at (0,−40000) and `WENTAREFIT`
-`t1` 0.12 m³/s (velocity 4 m/s) re-sizes the branch to Ø125, sets the
-straight-run damper `dS` to ζ 0.14 with the branch damper `dB` open, and
-takes 2.59 → 6.98 Pa with no residual imbalance in about 6 ms; `WENTAREAD`
-reads 6.98 Pa back with no edits.
+`t1` 0.2 m³/s (velocity 4 m/s) re-sizes the main and the straight run
+feeding it from Ø250 / Ø200 to Ø300 (the tee and damper `dS` follow, the
+branch to `t2` keeps Ø160), sets `dS` to ζ 0.05 with the branch damper
+`dB` open, and takes 2.59 → 3.70 Pa with no residual imbalance in about
+6 ms; `WENTAREAD` reads 3.70 Pa back with no edits.
 
 ### 3.13 `WENTAFAN` — fan at the duty point
 
@@ -471,9 +472,11 @@ changed and the critical-path ΔP before and after.
 Prompts: the terminal, its new flow (m³/s), and the sizing method
 `[Velocity/EqualFriction]` with its target. In one command it sets the
 flow, opens every damper (a two-port fitting whose record has role
-`damper`), re-sizes every duct for its new flow with the `WENTASIZE`
-methods (`ReFit.Apply`), lets an in-line fitting that had the section of
-the duct feeding it take the duct's new section, solves the network, and
+`damper`), re-sizes the affected legs (the ducts between the source and
+that terminal) for their new flow with the `WENTASIZE` methods
+(`ReFit.Apply`; the other runs carry the same flow and keep their size),
+lets a tee or in-line fitting that had the section of the duct feeding it
+take the duct's new section, solves the network, and
 sets the damper on the run feeding each terminal to the ζ that brings the
 terminal's path up to the critical one (`Balancing.BalancingZeta` at the
 damper's own velocity; the damper on the critical path stays open). The

@@ -212,7 +212,7 @@ namespace WentaZwcad
 
         // ------------------------------------------------------------ WENTAREFIT
 
-        // #27: one terminal's new flow; every duct re-sized for its flow, the
+        // #27: one terminal's new flow; the ducts feeding it re-sized, the
         // network re-solved, and each damper (role "damper") set so its
         // terminal's path matches the critical one. All in one command.
         [CommandMethod("WENTAREFIT")]

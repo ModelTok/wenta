@@ -2545,14 +2545,21 @@ namespace Wenta.Core.Tests
             CheckTrue("refit.no_damper_without_role", NetworkEdit.DamperFeeding(dn, new Dictionary<string, ComponentMeta>(), "t1") == null);
 
             var opt = new ReFitOptions { Method = SizingMethod.Velocity, TargetVelocity = 4.0 };
-            ReFlowResult rf = NetworkEdit.ReFlow(dn, dmeta, "t1", 0.12, opt);
+            ReFlowResult rf = NetworkEdit.ReFlow(dn, dmeta, "t1", 0.2, opt);
             Check("refit.old_flow", rf.OldFlowM3s, 0.06, 1e-15);
-            Check("refit.new_flow", ((Terminal)rf.Network.Components["t1"]).Flowrate, 0.12, 1e-15);
+            Check("refit.new_flow", ((Terminal)rf.Network.Components["t1"]).Flowrate, 0.2, 1e-15);
             CheckTrue("refit.resized_some", rf.Resized.Count > 0);
-            // The duct sizes are ReFit.Apply's for the new flow.
-            Network manual = NetworkEdit.Rebuild(DamperNetwork(0.0), new Dictionary<string, Component> { { "t1", new Terminal("t1", 0.12, null, 0.0) } });
+            // The legs feeding t1 take ReFit.Apply's sizes for the new flow;
+            // the branch to t2 carries the same flow and keeps its size.
+            Network manual = NetworkEdit.Rebuild(DamperNetwork(0.0), new Dictionary<string, Component> { { "t1", new Terminal("t1", 0.2, null, 0.0) } });
             ReFitResult mfit = ReFit.Apply(manual, opt);
-            foreach (string duct in new[] { "main", "straight", "branch" })
+            var up1 = new List<string>(NetworkEdit.Upstream(dn, "t1")); up1.Sort(StringComparer.Ordinal);
+            CheckStr("refit.affected", string.Join(",", up1.ToArray()), "dS,main,src,straight,tee");
+            CheckStr("refit.branch_kept", DrawingSizing.SizeText(((RigidDuct)rf.Network.Components["branch"]).CrossSection), "Ø160");
+            CheckStr("refit.straight_up", DrawingSizing.SizeText(((RigidDuct)rf.Network.Components["straight"]).CrossSection), "Ø300");
+            CheckInt("refit.resized_two", rf.Resized.Count, 2);
+            CheckStr("refit.tee_follows_main", DrawingSizing.SizeText(((Tee)rf.Network.Components["tee"]).CrossSection), "Ø300");
+            foreach (string duct in new[] { "main", "straight" })
                 CheckTrue("refit.size_" + duct, NetworkEdit.SameSection(
                     ((RigidDuct)rf.Network.Components[duct]).CrossSection, ((RigidDuct)mfit.Network.Components[duct]).CrossSection));
             CheckTrue("refit.damper_follows_duct", NetworkEdit.SameSection(
@@ -2566,7 +2573,7 @@ namespace Wenta.Core.Tests
             Check("refit.paths_equal", after[0].AvailableDpPa, after[1].AvailableDpPa, 1e-9);
             Check("refit.critical_reported", rf.CriticalAfterPa, rf.Network.Solve(), 1e-12);
             CheckTrue("refit.fast", rf.ElapsedMs < 200.0);
-            ReFlowResult rf0 = NetworkEdit.ReFlow(DamperNetwork(0.0), dmeta, "t1", 0.12, opt);
+            ReFlowResult rf0 = NetworkEdit.ReFlow(DamperNetwork(0.0), dmeta, "t1", 0.2, opt);
             Check("refit.ignores_old_damper_setting", rf0.CriticalAfterPa, rf.CriticalAfterPa, 1e-12);
             NetworkReadResult rfBack = RoundTrip(rf.Network, rf.Meta);
             CheckTrue("refit.reads_back", rfBack.Ok && rfBack.LengthUpdated.Count == 0);
@@ -2578,7 +2585,7 @@ namespace Wenta.Core.Tests
             Network ex = NetworkJson.Load(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "examples", "example-dampers-network.json"), out exMeta);
             Check("refit.example_dp", ex.Solve(), DamperNetwork(0.0).Solve(), 1e-12);
             CheckStr("refit.example_damper_role", NetworkEdit.DamperFeeding(ex, exMeta, "t2"), "dB");
-            ReFlowResult rfx = NetworkEdit.ReFlow(ex, exMeta, "t1", 0.12, opt);
+            ReFlowResult rfx = NetworkEdit.ReFlow(ex, exMeta, "t1", 0.2, opt);
             Check("refit.example_same", rfx.CriticalAfterPa, rf.CriticalAfterPa, 1e-12);
         }
 

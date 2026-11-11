@@ -382,7 +382,7 @@ namespace Wenta
 
         // -------------------------------------------------------- re-fit
 
-        // #27: one terminal's flow changes; every duct is re-sized for its
+        // #27: one terminal's flow changes; the ducts feeding it are re-sized for their
         // new flow (ReFit.Apply, the WENTASIZE methods), the network is
         // re-solved, and each damper (a two-port fitting with role
         // "damper") on the run feeding a terminal is set to the ζ that
@@ -411,9 +411,19 @@ namespace Wenta
                     repl[kv.Key] = WithZeta(kv.Value, 0.0);
             Network edited = Rebuild(net, repl);
 
+            // Only the affected legs, the ducts between the source and this
+            // terminal, are re-sized; the other runs carry the same flow as
+            // before and keep the size they were given.
             ReFitResult fit = ReFit.Apply(edited, options);
-            foreach (ReFitChange ch in fit.Changes) if (ch.Changed) res.Resized.Add(ch);
-            Network sized = FollowSizes(edited, fit.Network);
+            HashSet<string> affected = Upstream(edited, terminalId);
+            var resize = new Dictionary<string, Component>();
+            foreach (ReFitChange ch in fit.Changes)
+            {
+                if (!ch.Changed || !affected.Contains(ch.ComponentId)) continue;
+                res.Resized.Add(ch);
+                resize[ch.ComponentId] = fit.Network.Components[ch.ComponentId];
+            }
+            Network sized = FollowSizes(edited, resize.Count > 0 ? Rebuild(edited, resize) : edited);
             sized.Solve(fluid);
             res.Hints = ReFit.Hints(sized, fluid);
 
@@ -454,22 +464,49 @@ namespace Wenta
             return res;
         }
 
-        // After re-sizing: an in-line fitting (damper, attenuator, ...)
-        // that had the section of the duct feeding it takes that duct's new
-        // section, so a damper does not stay at the old size.
+        // Every component upstream of `cid` (through its in ports), not
+        // including `cid` itself: the path that carries its flow.
+        public static HashSet<string> Upstream(Network net, string cid)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var stack = new Stack<string>();
+            stack.Push(cid);
+            while (stack.Count > 0)
+            {
+                string at = stack.Pop();
+                foreach (Port p in net.Components[at].Ports)
+                {
+                    if (!p.IsIn) continue;
+                    foreach (string pred in net.Predecessors(Network.PortNodeId(at, p.Name)))
+                    {
+                        int colon = pred.IndexOf(':');
+                        if (colon <= 0) continue;
+                        string prev = pred.Substring(0, colon);
+                        if (prev != cid && seen.Add(prev)) stack.Push(prev);
+                    }
+                }
+            }
+            return seen;
+        }
+
+        // After re-sizing: an in-line fitting (damper, attenuator, ...) or
+        // tee that had the section of the duct feeding it takes that duct's
+        // new section, so a damper or tee does not stay at the old size.
         public static Network FollowSizes(Network before, Network after)
         {
             var repl = new Dictionary<string, Component>();
             foreach (KeyValuePair<string, Component> kv in after.Components)
             {
-                var f = kv.Value as TwoPortFitting;
-                if (f == null) continue;
+                bool tee = kv.Value is Tee;
+                if (!(kv.Value is TwoPortFitting) && !tee) continue;
+                CrossSection own = SectionOf(kv.Value);
                 string up = kv.Key;
+                string inlet = tee ? "combined" : "inlet";
                 CrossSection oldUp = null, newUp = null;
                 for (int guard = 0; guard <= after.Components.Count && oldUp == null; guard++)
                 {
                     string pred = null;
-                    foreach (string n in after.Predecessors(Network.PortNodeId(up, "inlet")))
+                    foreach (string n in after.Predecessors(Network.PortNodeId(up, inlet)))
                         if (n.IndexOf(':') > 0) { pred = n.Substring(0, n.IndexOf(':')); break; }
                     if (pred == null) break;
                     Component pa = after.Components[pred];
@@ -478,11 +515,11 @@ namespace Wenta
                         oldUp = SectionOf(before.Components[pred]);
                         newUp = SectionOf(pa);
                     }
-                    else if (pa is TwoPortFitting) up = pred;
+                    else if (pa is TwoPortFitting) { up = pred; inlet = "inlet"; }
                     else break;
                 }
-                if (oldUp == null || SameSection(oldUp, newUp) || !SameSection(f.CrossSection, oldUp)) continue;
-                repl[kv.Key] = WithSection(f, newUp);
+                if (oldUp == null || SameSection(oldUp, newUp) || !SameSection(own, oldUp)) continue;
+                repl[kv.Key] = WithSection(kv.Value, newUp);
             }
             return repl.Count == 0 ? after : Rebuild(after, repl);
         }

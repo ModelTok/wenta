@@ -94,7 +94,7 @@ Two kinds of assertions, both in `Wenta.Core.Tests/Program.cs`:
   `WENTAMOVE`, `WENTASTRETCH` and `WENTAREFIT`: one property (diameter
   snapped to EN 1506, width, height, length, flow, ζ), stretch a duct and
   move what is downstream, move a point component with its ducts' ends,
-  and `ReFlow` (new terminal flow → `ReFit.Apply` → damper ζ per terminal
+  and `ReFlow` (new terminal flow → `ReFit.Apply` on the legs feeding it → damper ζ per terminal
   via `Balancing.BalancingZeta`), each returning the new network and layout.
 - **`Attenuators.cs`** — the attenuator catalog JSON (`AttenuatorCatalog`,
   example `catalogs/example-attenuators.json`, fictional) and

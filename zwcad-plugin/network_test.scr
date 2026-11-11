@@ -147,7 +147,7 @@ example-dampers-network.json
 0,-40000
 _.WENTAREFIT
 t1
-0.12
+0.2
 Velocity
 4
 _.WENTAREAD
