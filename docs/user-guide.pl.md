@@ -328,6 +328,10 @@ aktualizuje 7 obiektów w miejscu, a JSON z drugiego `WENTAREAD` jest
 identyczny bajt w bajt z pierwszym; po usunięciu elementów punktowych
 `WENTAREAD` odmawia z powodu osieroconych znaczników, a po wydłużeniu
 jednego narysowanego przewodu o 1 m zgłasza jedną zmianę i 5,14 Pa.
+Na końcu `WENTAATTEN` (studio, 50 m², α 0,2, przykładowy katalog) wstawia
+`ExampleAtten EA-200-1200` i `EA-200-600` przed dwoma terminalami, żadne
+pomieszczenie nie przekracza limitu, a ΔP rośnie z 5,14 do 6,84 Pa;
+`WENTAREAD` odczytuje potem 9 elementów i 6,84 Pa.
 
 ### 3.13 `WENTAFAN` — wentylator w punkcie pracy
 
@@ -374,15 +378,19 @@ zasila, przenosi go do pomieszczenia równaniem pomieszczenia i porównuje
 wynik z limitem dla rodzaju pomieszczenia (`DrawingSound.Rooms`, §4.10).
 Pomieszczenia są wypisywane od najgorszego, wartości trafiają do znaczników
 terminali (`sound_lp_db`, `sound_nc_limit`, `sound_ok`), a tabela do
-**`%TEMP%\wenta_sound.csv`**. Dobór tłumika (`WENTAATTEN`) nie jest jeszcze
-zaimplementowany.
+**`%TEMP%\wenta_sound.csv`**. Tłumiki dla pomieszczeń powyżej limitu
+dobiera `WENTAATTEN` (§3.18).
 
 ### 3.16 `WENTAHELP` — lista poleceń i podręcznik
 
 Wypisuje wszystkie polecenia z jednowierszowym opisem oraz ścieżki
 podręcznika angielskiego i polskiego, które `install.ps1` kopiuje obok DLL.
 Zapytanie `Open the user guide [English/Polski/No] <No>` otwiera wybrany
-podręcznik (plik Markdown) programem, który Windows kojarzy z `.md`.
+podręcznik w domyślnej przeglądarce: stronę HTML ze spisem treści,
+generowaną z podręcznika Markdown podczas budowania wtyczki
+(`zwcad-plugin/tools/MakeHelp.cs`, `Wenta.Markdown`). Jeżeli pliku HTML
+nie ma, otwierany jest plik Markdown programem, który Windows kojarzy
+z `.md`.
 
 ### 3.17 `WENTAWRITE` / `WENTAREAD` — sieć JSON ⇄ rysunek
 
@@ -416,9 +424,38 @@ powielone id, klasa niezgodna z typem, rekord przewodu na obiekcie
 punktowym lub odwrotnie, brakująca wartość, nieznany port albo sieć, która
 nie przechodzi walidacji. Wypisywanych jest do 20 problemów.
 
-### 3.18 Karta wstęgi „Wenta”
+### 3.18 `WENTAATTEN` — tłumiki dla pomieszczeń powyżej limitu
 
-Jeden panel z szesnastoma dużymi przyciskami, każdy uruchamia jedno polecenie:
+Odczytuje narysowaną sieć tak jak `WENTAREAD` (wszystkie oznaczone obiekty
+w obszarze modelu) i odmawia, wypisując problemy, gdy rysunek nie
+przechodzi walidacji. Zapytania: rodzaj pomieszczenia
+`[studio/bedroom/office/classroom/retail/industrial]`, powierzchnia
+przegród (m²), średni współczynnik pochłaniania α oraz katalog tłumików
+(domyślnie `example-attenuators.json` obok DLL, §5.5). Dla każdego
+terminala oblicza hałas w pomieszczeniu tak jak `WENTASOUND`, z odcinka
+sztywnego, który zasila terminal (także przez kształtki dwuportowe),
+odejmując tłumiki już zamontowane na tym odcinku. Dla każdego pomieszczenia
+powyżej limitu wybiera spośród pozycji katalogu o średnicy odcinka
+zasilającego (±0,5 mm) tę o najmniejszym ζ, której tłumienie wtrąceniowe
+pokrywa przekroczenie (przy remisie krótszą), i wstawia ją przed terminalem
+jako kształtkę dwuportową `atten_<terminal>` z ζ, GUID, pozycją katalogową
+i pochodzeniem z katalogu. Sieć jest obliczana ponownie, a nowe elementy są
+rysowane (500 mm wstecz wzdłuż ostatniego segmentu odcinka) przez
+`WENTAWRITE`, więc `WENTAREAD` odczytuje je z powrotem. Pomieszczenie,
+którego żadna pozycja katalogu nie sprowadza poniżej limitu, jest
+zgłaszane, ale nie jest zmieniane. Tabela trafia do
+**`%TEMP%\wenta_atten.csv`**, a zaktualizowana sieć do
+**`%TEMP%\wenta_atten.json`**.
+
+Dobór używa jednej wartości tłumienia wtrąceniowego na urządzenie wobec
+jednoliczbowego poziomu w pomieszczeniu z §4.10; nie ma danych w pasmach
+oktawowych, promieniowania przez ścianki ani propagacji wzdłuż przewodów,
+więc wynik jest pierwszym sprawdzeniem. Urządzenia
+w `example-attenuators.json` są fikcyjne.
+
+### 3.19 Karta wstęgi „Wenta”
+
+Jeden panel z siedemnastoma dużymi przyciskami, każdy uruchamia jedno polecenie:
 
 | Przycisk | Polecenie |
 |---|---|
@@ -435,13 +472,14 @@ Jeden panel z szesnastoma dużymi przyciskami, każdy uruchamia jedno polecenie:
 | Select Fan | `WENTAFAN` |
 | Insulate | `WENTAINSULATE` |
 | Room Sound | `WENTASOUND` |
+| Attenuators | `WENTAATTEN` |
 | Draw Network | `WENTAWRITE` |
 | Read Network | `WENTAREAD` |
 | Wenta Help | `WENTAHELP` |
 
-### 3.19 Plan rozwoju
+### 3.20 Plan rozwoju
 
-Polecenia takie jak `WENTAFITTING` i `WENTAATTEN`
+Polecenia takie jak `WENTAFITTING`
 są planowane, nie zaimplementowane; część biblioteczna kilku z nich już istnieje (patrz §4).
 Plan znajduje się w `zwcad-plugin/ROADMAP.md` oraz w zgłoszeniach GitHub
 repozytorium `ModelTok/wenta`.
@@ -812,6 +850,29 @@ wybiera pierwszy wentylator, który spełnia punkt pracy, więc wentylatory
 należy podawać od najmniejszego do największego. Wczytanie:
 `FanCatalog.Load(path)`. Cztery wentylatory w `example-fans.json` są
 zmyślone i służą tylko do sprawdzenia formatu.
+
+### 5.5 Katalog tłumików (`csharp/catalogs/example-attenuators.json`, wersja 1)
+
+```json
+{
+  "name": "example-attenuators",
+  "version": 1,
+  "description": "...",
+  "attenuators": [
+    { "id": "ExampleAtten EA-160-600", "diameter_mm": 160, "length_mm": 600,
+      "insertion_loss_db": 8.0, "zeta": 0.45, "source": "fictional example" }
+  ]
+}
+```
+
+Każdy tłumik ma `id` (unikalne w pliku), średnicę przyłącza `diameter_mm`
+i długość `length_mm` (obie dodatnie), jednoliczbowe tłumienie wtrąceniowe
+`insertion_loss_db` (dodatnie) oraz `zeta` (≥ 0, przy prędkości
+w przyłączu). `source` i `notes` to dowolny tekst; `source` trafia do
+pochodzenia wstawionego elementu. Plik z `version` nowszą niż 1 jest
+odrzucany. Wczytanie: `AttenuatorCatalog.Load(path)`. 21 urządzeń
+w `example-attenuators.json` (Ø100–Ø315, 600/900/1200 mm) jest fikcyjnych
+i służy tylko do sprawdzenia formatu.
 
 ## 6. Rozwiązywanie problemów
 

@@ -25,7 +25,8 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 }
 
 $files = 'WentaZwcad.dll', 'Wenta.CUIX', 'example-generic.json', 'example-fans.json',
-    'user-guide.en.md', 'user-guide.pl.md'
+    'example-attenuators.json', 'user-guide.en.md', 'user-guide.pl.md',
+    'user-guide.en.html', 'user-guide.pl.html'
 foreach ($f in $files) {
     $src = Join-Path $bin $f
     if (-not (Test-Path $src)) { throw "build output missing: $src (run build.cmd)" }

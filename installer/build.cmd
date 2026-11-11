@@ -4,7 +4,7 @@ rem Build WentaZwcad.msi (issue #36).
 rem
 rem Prerequisites:
 rem   1. zwcad-plugin\build.cmd has run, so zwcad-plugin\bin contains
-rem      WentaZwcad.dll, Wenta.CUIX and example-generic.json.
+rem      WentaZwcad.dll, Wenta.CUIX, the example catalogs and the HTML guides.
 rem   2. The WiX 7 dotnet tool:  dotnet tool install --global wix
 rem
 rem Usage:  build.cmd [version]        (default version below)
@@ -18,7 +18,7 @@ set ROOT=%~dp0
 set BIN=%ROOT%..\zwcad-plugin\bin
 set OUT=%ROOT%bin
 
-for %%F in (WentaZwcad.dll Wenta.CUIX example-generic.json) do (
+for %%F in (WentaZwcad.dll Wenta.CUIX example-generic.json example-fans.json example-attenuators.json user-guide.en.html user-guide.pl.html) do (
   if not exist "%BIN%\%%F" (
     echo MISSING: %BIN%\%%F  -- run zwcad-plugin\build.cmd first
     exit /b 1

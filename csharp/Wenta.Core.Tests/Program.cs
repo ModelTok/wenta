@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Text.RegularExpressions;
 using Wenta;
 
 namespace Wenta.Core.Tests
@@ -60,6 +61,8 @@ namespace Wenta.Core.Tests
             RunFanCatalog(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "catalogs"));
             RunDrawingInsulation();
             RunNetworkDrawing();
+            RunMarkdown(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "docs"));
+            RunAttenuators(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "catalogs"));
             RunPerformance();
 
             Console.WriteLine();
@@ -2623,6 +2626,234 @@ namespace Wenta.Core.Tests
         }
 
         // WENTAINSULATE: DrawingInsulation is Insulation + SelectThickness for a round run.
+        // ---- Markdown: user guide HTML for WENTAHELP (#37) ----
+
+        private static int Count(string s, string sub)
+        {
+            int n = 0;
+            for (int i = s.IndexOf(sub, StringComparison.Ordinal); i >= 0; i = s.IndexOf(sub, i + sub.Length, StringComparison.Ordinal)) n++;
+            return n;
+        }
+
+        private static void RunMarkdown(string docsDir)
+        {
+            CheckStr("md.heading", Markdown.ToHtml("## 3.1 `WENTADUCT` — size"),
+                "<h2 id=\"31-wentaduct--size\">3.1 <code>WENTADUCT</code> — size</h2>\n");
+            CheckStr("md.paragraph_joined", Markdown.ToHtml("one\ntwo\n\nthree"), "<p>one\ntwo</p>\n<p>three</p>\n");
+            CheckStr("md.escape_text", Markdown.ToHtml("a < b & \"c\""), "<p>a &lt; b &amp; &quot;c&quot;</p>\n");
+            CheckStr("md.raw_html_escaped", Markdown.ToHtml("<script>x</script>"), "<p>&lt;script&gt;x&lt;/script&gt;</p>\n");
+            CheckStr("md.code_span_escaped", Markdown.Inline("`<path>` and `a*b*c`"), "<code>&lt;path&gt;</code> and <code>a*b*c</code>");
+            CheckStr("md.double_tick_span", Markdown.Inline("``a ` b``"), "<code>a ` b</code>");
+            CheckStr("md.bold_italic", Markdown.Inline("**bold** and *it* but 2 * 3 * 4"), "<strong>bold</strong> and <em>it</em> but 2 * 3 * 4");
+            CheckStr("md.link", Markdown.Inline("[guide](user-guide.pl.html#3-polecenia)"), "<a href=\"user-guide.pl.html#3-polecenia\">guide</a>");
+            CheckStr("md.link_js_blocked", Markdown.Inline("[x](javascript:alert(1))"), "<a href=\"#\">x</a>)");
+            CheckStr("md.autolink", Markdown.Inline("see <https://github.com/ModelTok/wenta>."),
+                "see <a href=\"https://github.com/ModelTok/wenta\">https://github.com/ModelTok/wenta</a>.");
+            CheckStr("md.fence", Markdown.ToHtml("```json\n{ \"a\": \"<b>\" }\n```"),
+                "<pre><code class=\"language-json\">{ &quot;a&quot;: &quot;&lt;b&gt;&quot; }\n</code></pre>\n");
+            CheckStr("md.fence_keeps_markup", Markdown.ToHtml("```\n## not a heading\n- not a list\n```"),
+                "<pre><code>## not a heading\n- not a list\n</code></pre>\n");
+            CheckStr("md.list_continuation", Markdown.ToHtml("- one\n  more\n- two"),
+                "<ul>\n<li>one\nmore</li>\n<li>two</li>\n</ul>\n");
+            CheckStr("md.list_blank_between_items", Markdown.ToHtml("1. a\n\n2. b\n\npara"),
+                "<ol>\n<li>a</li>\n<li>b</li>\n</ol>\n<p>para</p>\n");
+            CheckStr("md.ol_start", Markdown.ToHtml("3. c"), "<ol start=\"3\">\n<li>c</li>\n</ol>\n");
+            CheckStr("md.bullet_interrupts_paragraph", Markdown.ToHtml("Steps:\n- a"), "<p>Steps:</p>\n<ul>\n<li>a</li>\n</ul>\n");
+            CheckStr("md.number_does_not_interrupt", Markdown.ToHtml("In\n2024. it"), "<p>In\n2024. it</p>\n");
+            CheckStr("md.rule", Markdown.ToHtml("a\n\n---\n\nb"), "<p>a</p>\n<hr>\n<p>b</p>\n");
+            CheckStr("md.table", Markdown.ToHtml("| A | B |\n|---|--:|\n| `x|y` | 2 |\n| 3 |"),
+                "<table>\n<thead>\n<tr><th>A</th><th style=\"text-align:right\">B</th></tr>\n</thead>\n<tbody>\n"
+                + "<tr><td><code>x|y</code></td><td style=\"text-align:right\">2</td></tr>\n"
+                + "<tr><td>3</td><td style=\"text-align:right\"></td></tr>\n</tbody>\n</table>\n");
+            CheckStr("md.slug_polish", Markdown.Slug("3.17 Karta wstęgi „Wenta”"), "317-karta-wstęgi-wenta");
+            List<Markdown.Section> hs;
+            Markdown.ToHtml("## A\n## A", out hs);
+            CheckStr("md.unique_ids", hs[0].Id + "," + hs[1].Id, "a,a-1");
+            string doc = Markdown.ToHtmlDocument("# Wenta <guide>\n\n## One\n\n### Two\n\ntext", "fallback", "pl");
+            CheckTrue("md.doc_title", doc.Contains("<title>Wenta &lt;guide&gt;</title>"));
+            CheckTrue("md.doc_lang", doc.Contains("<html lang=\"pl\">"));
+            CheckTrue("md.doc_toc", doc.Contains("<li class=\"toc2\"><a href=\"#one\">One</a></li>")
+                && doc.Contains("<li class=\"toc3\"><a href=\"#two\">Two</a></li>"));
+            CheckTrue("md.doc_dark_mode", doc.Contains("prefers-color-scheme:dark"));
+            CheckTrue("md.doc_toc_after_title", doc.IndexOf("</h1>", StringComparison.Ordinal) < doc.IndexOf("<nav class=\"toc\">", StringComparison.Ordinal)
+                && doc.IndexOf("<nav class=\"toc\">", StringComparison.Ordinal) < doc.IndexOf("<h2", StringComparison.Ordinal));
+
+            // The real guides convert completely: every heading, table and
+            // fence of the source is in the HTML and no Markdown syntax leaks.
+            foreach (string lang in new[] { "en", "pl" })
+            {
+                string path = Path.Combine(docsDir, "user-guide." + lang + ".md");
+                if (!File.Exists(path)) { Fail("md.guide_" + lang, "missing " + path); continue; }
+                string md = File.ReadAllText(path).Replace("\r\n", "\n");
+                string html = Markdown.ToHtmlDocument(md, "Wenta", lang);
+                string[] lines = md.Split('\n');
+                int h2 = 0, h3 = 0, fences = 0, tables = 0;
+                bool inFence = false;
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    if (lines[i].StartsWith("```", StringComparison.Ordinal)) { fences++; inFence = !inFence; continue; }
+                    if (inFence) continue;
+                    if (lines[i].StartsWith("## ", StringComparison.Ordinal)) h2++;
+                    if (lines[i].StartsWith("### ", StringComparison.Ordinal)) h3++;
+                    if (lines[i].StartsWith("|", StringComparison.Ordinal) && i + 1 < lines.Length
+                        && lines[i + 1].StartsWith("|-", StringComparison.Ordinal)) tables++;
+                }
+                CheckInt("md.guide_" + lang + "_h2", Count(html, "<h2 id="), h2);
+                CheckInt("md.guide_" + lang + "_h3", Count(html, "<h3 id="), h3);
+                CheckInt("md.guide_" + lang + "_toc", Count(html, "<li class=\"toc"), h2 + h3);
+                CheckInt("md.guide_" + lang + "_fences", Count(html, "<pre><code"), fences / 2);
+                CheckInt("md.guide_" + lang + "_tables", Count(html, "<table>"), tables);
+                CheckTrue("md.guide_" + lang + "_no_fence_leak", !html.Contains("```"));
+                CheckTrue("md.guide_" + lang + "_no_bold_leak", !Regex.IsMatch(Regex.Replace(html, "<code>.*?</code>|<pre>.*?</pre>", "", RegexOptions.Singleline), @"\*\*"));
+                CheckTrue("md.guide_" + lang + "_no_table_leak", !html.Contains("|---"));
+                CheckTrue("md.guide_" + lang + "_balanced_lists", Count(html, "<ul>") == Count(html, "</ul>") && Count(html, "<ol") == Count(html, "</ol>"));
+                CheckTrue("md.guide_" + lang + "_has_wentahelp", html.Contains("<code>WENTAHELP</code>"));
+            }
+        }
+
+        // ---- Attenuators: WENTAATTEN selection and insertion (#48) ----
+
+        private static void RunAttenuators(string catalogDir)
+        {
+            AttenuatorCatalog cat = AttenuatorCatalog.Load(Path.Combine(catalogDir, "example-attenuators.json"));
+            CheckStr("atten.cat_name", cat.Name, "example-attenuators");
+            CheckInt("atten.cat_count", cat.Attenuators.Count, 21);
+            Attenuator first = cat.Attenuators[0];
+            Check("atten.cat_units_d", first.DiameterM, 0.1, 1e-15);
+            Check("atten.cat_units_l", first.LengthM, 0.6, 1e-15);
+
+            // Pick: lowest zeta whose insertion loss covers the requirement.
+            CheckStr("atten.pick_short", AttenuatorSelection.Pick(cat, 0.2, 7.0).Id, "ExampleAtten EA-200-600");
+            CheckStr("atten.pick_mid", AttenuatorSelection.Pick(cat, 0.2, 7.01).Id, "ExampleAtten EA-200-900");
+            CheckStr("atten.pick_long", AttenuatorSelection.Pick(cat, 0.2, 10.9).Id, "ExampleAtten EA-200-1200");
+            CheckTrue("atten.pick_none_too_loud", AttenuatorSelection.Pick(cat, 0.2, 14.1) == null);
+            CheckTrue("atten.pick_none_size", AttenuatorSelection.Pick(cat, 0.18, 1.0) == null);
+            var tie = AttenuatorCatalog.Parse("{\"attenuators\":[{\"id\":\"long\",\"diameter_mm\":200,\"length_mm\":900,\"insertion_loss_db\":9,\"zeta\":0.5},"
+                + "{\"id\":\"short\",\"diameter_mm\":200,\"length_mm\":600,\"insertion_loss_db\":9,\"zeta\":0.5}]}", "tie");
+            CheckStr("atten.pick_tie_shorter", AttenuatorSelection.Pick(tie, 0.2, 5.0).Id, "short");
+
+            // Catalog validation.
+            ExpectError(true, "atten.cat_bad_json", () => AttenuatorCatalog.Parse("{", "x"));
+            ExpectError(true, "atten.cat_no_array", () => AttenuatorCatalog.Parse("{\"name\":\"x\"}", "x"));
+            ExpectError(true, "atten.cat_newer_version", () => AttenuatorCatalog.Parse("{\"version\":2,\"attenuators\":[]}", "x"));
+            ExpectError(true, "atten.cat_duplicate", () => AttenuatorCatalog.Parse("{\"attenuators\":[{\"id\":\"a\",\"diameter_mm\":200,\"length_mm\":600,\"insertion_loss_db\":5,\"zeta\":0.4},{\"id\":\"a\",\"diameter_mm\":200,\"length_mm\":600,\"insertion_loss_db\":5,\"zeta\":0.4}]}", "x"));
+            ExpectError(true, "atten.cat_negative_zeta", () => AttenuatorCatalog.Parse("{\"attenuators\":[{\"id\":\"a\",\"diameter_mm\":200,\"length_mm\":600,\"insertion_loss_db\":5,\"zeta\":-0.1}]}", "x"));
+            ExpectError(true, "atten.cat_missing_loss", () => AttenuatorCatalog.Parse("{\"attenuators\":[{\"id\":\"a\",\"diameter_mm\":200,\"length_mm\":600,\"zeta\":0.4}]}", "x"));
+            ExpectError(true, "atten.cat_no_id", () => AttenuatorCatalog.Parse("{\"attenuators\":[{\"diameter_mm\":200,\"length_mm\":600,\"insertion_loss_db\":5,\"zeta\":0.4}]}", "x"));
+
+            // Reference network (Ø250 main, Ø200 straight run at 0.06 m³/s,
+            // Ø160 branch at 0.04 m³/s), studio (NC 25), S = 50 m², α = 0.2.
+            Network net = ReferenceHandBuilt();
+            var meta = new Dictionary<string, ComponentMeta>();
+            NetworkDrawing.Write(net, meta, new Point2(0.0, 0.0), new List<string>());   // stores the layout
+            double vS = 0.06 / (Math.PI * 0.01), vB = 0.04 / (Math.PI * 0.0064);
+            double lpS = Sound.DuctPressureLevel(Sound.RegeneratedNoiseRound(vS, 0.2), 50.0, 0.2);
+            double lpB = Sound.DuctPressureLevel(Sound.RegeneratedNoiseRound(vB, 0.16), 50.0, 0.2);
+            Check("atten.ref_lp_straight", lpS, 10.0 + 60.0 * Math.Log10(vS) - 20.0 * Math.Log10(0.2) + 10.0 * Math.Log10(0.32), 1e-12);
+            AttenuatorResult r = AttenuatorSelection.Apply(net, meta, cat, "studio", 50.0, 0.2);
+            CheckInt("atten.rooms", r.Rooms.Count, 2);
+            CheckInt("atten.inserted", r.Inserted, 2);
+            RoomAttenuation worst = r.Rooms[0], other = r.Rooms[1];
+            CheckStr("atten.worst_first", worst.TerminalId, "t2");
+            CheckStr("atten.worst_duct", worst.DuctId, "branch");
+            Check("atten.worst_lp", worst.PressureLevelDb, lpB, 1e-12);
+            Check("atten.worst_required", worst.RequiredDb, lpB - 25.0, 1e-12);
+            CheckStr("atten.worst_pick", worst.Picked.Id, "ExampleAtten EA-160-1200");
+            Check("atten.worst_after", worst.LevelAfterDb, lpB - 16.0, 1e-12);
+            CheckTrue("atten.worst_ok", worst.Ok && worst.LevelAfterDb <= 25.0);
+            CheckStr("atten.other_pick", other.Picked.Id, "ExampleAtten EA-200-1200");
+            CheckStr("atten.inserted_id", other.InsertedId, "atten_t1");
+
+            // Spliced in and part of the solve: same ΔP as the hand-built
+            // network with the two fittings in place.
+            Network hand = new Network { Name = "hand" };
+            hand.Add("src", new Source("AHU"));
+            hand.Add("main", new RigidDuct("main", new Round(0.25), 5.0));
+            hand.Add("tee", new Tee("tee", new Round(0.25), 0.0, 0.5));
+            hand.Add("straight", new RigidDuct("straight", new Round(0.2), 3.0));
+            hand.Add("branch", new RigidDuct("branch", new Round(0.16), 3.0));
+            hand.Add("a1", new TwoPortFitting("a1", new Round(0.2), 0.8));
+            hand.Add("a2", new TwoPortFitting("a2", new Round(0.16), 0.8));
+            hand.Add("t1", new Terminal("t1", 0.06, null, 0.0));
+            hand.Add("t2", new Terminal("t2", 0.04, null, 0.0));
+            hand.Connect("src", "main.inlet");
+            hand.Connect("main.outlet", "tee.combined");
+            hand.Connect("tee.straight", "straight.inlet");
+            hand.Connect("tee.branch", "branch.inlet");
+            hand.Connect("straight.outlet", "a1.inlet");
+            hand.Connect("a1.outlet", "t1");
+            hand.Connect("branch.outlet", "a2.inlet");
+            hand.Connect("a2.outlet", "t2");
+            double dpHand = hand.Solve();
+            Check("atten.solve_includes_loss", r.CriticalPa, dpHand, 1e-12);
+            CheckTrue("atten.dp_increased", r.CriticalPa > ReferenceHandBuilt().Solve());
+            CheckInt("atten.components", r.Network.Components.Count, 9);
+            CheckInt("atten.validates", r.Network.Validate().Count, 0);
+            ComponentMeta am = r.Meta["atten_t1"];
+            CheckStr("atten.meta_role", am.Role, "attenuator");
+            CheckStr("atten.meta_catalog", am.CatalogEntry, "ExampleAtten EA-200-1200");
+            CheckStr("atten.meta_provenance", am.Provenance, "example-attenuators (fictional example)");
+            CheckTrue("atten.meta_guid", !string.IsNullOrEmpty(am.Guid));
+            // Placed on the straight run's last segment, 500 mm back from its end.
+            List<Point2> sl = meta["straight"].LayoutMm;
+            Point2 end = sl[sl.Count - 1];
+            CheckTrue("atten.placed_on_run", am.AtMm.HasValue
+                && Math.Abs(Math.Sqrt(Math.Pow(am.AtMm.Value.X - end.X, 2) + Math.Pow(am.AtMm.Value.Y - end.Y, 2)) - 500.0) < 1e-9);
+
+            // Drawn and read back like any network: tag class "attenuator",
+            // layout kept (no warnings), the read-back solves to the same ΔP.
+            var warn = new List<string>();
+            List<DrawnComponent> drawn = NetworkDrawing.Write(r.Network, r.Meta, new Point2(0.0, 0.0), warn);
+            CheckInt("atten.draw_no_warnings", warn.Count, 0);
+            CheckStr("atten.draw_class", ByCid(drawn, "atten_t1").Tag.Class, NetworkDrawing.ClassAttenuator);
+            CheckStr("atten.draw_catalog", ByCid(drawn, "atten_t1").Tag.Get("catalog"), "ExampleAtten EA-200-1200");
+            NetworkReadResult back = NetworkDrawing.Read(AsDrawn(drawn), "hand");
+            CheckTrue("atten.read_ok", back.Ok);
+            Check("atten.read_dp", back.Network.Solve(), dpHand, 1e-12);
+            CheckStr("atten.read_role", back.Meta["atten_t2"].Role, "attenuator");
+
+            // Re-running finds the fitted attenuators and inserts nothing.
+            AttenuatorResult again = AttenuatorSelection.Apply(back.Network, back.Meta, cat, "studio", 50.0, 0.2);
+            CheckInt("atten.rerun_inserts_none", again.Inserted, 0);
+            CheckTrue("atten.rerun_ok", again.Rooms[0].Ok && again.Rooms[1].Ok);
+            CheckStr("atten.rerun_existing", again.Rooms[0].ExistingId, "atten_t2");
+            Check("atten.rerun_level", again.Rooms[0].LevelAfterDb, lpB - 16.0, 1e-12);
+
+            // Office (NC 35): the short units are enough.
+            AttenuatorResult office = AttenuatorSelection.Apply(ReferenceHandBuilt(), null, cat, "office", 50.0, 0.2);
+            CheckStr("atten.office_pick_branch", office.Rooms[0].Picked.Id, "ExampleAtten EA-160-600");
+            CheckStr("atten.office_pick_straight", office.Rooms[1].Picked.Id, "ExampleAtten EA-200-600");
+            // Industrial (NC 60): nothing needed, network unchanged.
+            Network quiet = ReferenceHandBuilt();
+            AttenuatorResult ind = AttenuatorSelection.Apply(quiet, null, cat, "industrial", 50.0, 0.2);
+            CheckInt("atten.industrial_none", ind.Inserted, 0);
+            CheckTrue("atten.industrial_same_network", ReferenceEquals(ind.Network, quiet));
+            CheckTrue("atten.industrial_required_zero", ind.Rooms[0].RequiredDb == 0.0 && ind.Rooms[0].Ok);
+            // No unit big enough: reported, nothing inserted for that room.
+            var small = AttenuatorCatalog.Parse("{\"name\":\"s\",\"attenuators\":[{\"id\":\"s200\",\"diameter_mm\":200,\"length_mm\":600,\"insertion_loss_db\":3,\"zeta\":0.3}]}", "s");
+            AttenuatorResult none = AttenuatorSelection.Apply(ReferenceHandBuilt(), null, small, "studio", 50.0, 0.2);
+            CheckInt("atten.none_inserted", none.Inserted, 0);
+            CheckTrue("atten.none_problem_size", none.Rooms[0].Problem != null && none.Rooms[0].Problem.Contains("Ø160"));
+            CheckTrue("atten.none_not_ok", !none.Rooms[0].Ok && !none.Rooms[1].Ok);
+            ExpectError(true, "atten.unknown_space", () => AttenuatorSelection.Apply(ReferenceHandBuilt(), null, cat, "garage", 50.0, 0.2));
+            // A terminal fed straight from a tee is skipped with a reason.
+            Network teeFed = new Network();
+            teeFed.Add("s", new Source("s"));
+            teeFed.Add("d", new RigidDuct("d", new Round(0.2), 2.0));
+            teeFed.Add("t", new Tee("t", new Round(0.2), 0.0, 0.5));
+            teeFed.Add("e", new RigidDuct("e", new Round(0.2), 2.0));
+            teeFed.Add("a", new Terminal("a", 0.05, null, 0.0));
+            teeFed.Add("b", new Terminal("b", 0.05, null, 0.0));
+            teeFed.Connect("s", "d.inlet");
+            teeFed.Connect("d.outlet", "t.combined");
+            teeFed.Connect("t.straight", "e.inlet");
+            teeFed.Connect("e.outlet", "a");
+            teeFed.Connect("t.branch", "b");
+            AttenuatorResult tf = AttenuatorSelection.Apply(teeFed, null, cat, "studio", 50.0, 0.2);
+            RoomAttenuation skipped = tf.Rooms[0].TerminalId == "b" ? tf.Rooms[0] : tf.Rooms[1];
+            CheckTrue("atten.tee_fed_skipped", skipped.Problem != null && skipped.DuctId == null && skipped.Picked == null);
+        }
+
         // ---- NetworkDrawing: WENTAWRITE / WENTAREAD round trip (#20, #22) ----
 
         // What ZWCAD stores: the tag goes through XData strings and back.

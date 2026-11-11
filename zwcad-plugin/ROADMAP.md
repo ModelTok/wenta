@@ -118,14 +118,14 @@ Where Ventpack wins today; a full phase, not an afterthought:
 
 The modules `venti` proved out are all in C# now (library half done in
 #64); what remains per module is the plugin command
-(`WENTAATTEN`, room balance, …; `WENTABALANCE`, `WENTAFAN`, `WENTAINSULATE`
-and `WENTASOUND` ship).
+(room balance, …; `WENTABALANCE`, `WENTAFAN`, `WENTAINSULATE`,
+`WENTASOUND` and `WENTAATTEN` ship).
 
 | former venti module | C# file | Library | Plugin command |
 |---|---|---|---|
 | `balancing` (damper ζ/open-%, branch surplus-Δ) | `Balancing.cs` | ✓ | `WENTABALANCE` ships (#49) |
 | `room` (balance/ACH, RoomBalanceSet + CSV) | `Room.cs` | ✓ | #26 |
-| `sound` (regenerated noise, room equation, NC) | `Sound.cs` | ✓ | `WENTASOUND` ships; attenuator `WENTAATTEN` open (#48) |
+| `sound` (regenerated noise, room equation, NC) | `Sound.cs` | ✓ | `WENTASOUND` ships; `WENTAATTEN` ships with single-number insertion loss and a fictional catalog — octave bands, breakout and propagation open (#48) |
 | `fan` (curves, duty point, power) | `Fan.cs` + `FanCatalog.cs` | ✓ | `WENTAFAN` ships (#50) |
 | `insulation` (condensation / heat-loss thickness) | `Insulation.cs` | ✓ | `WENTAINSULATE` ships, round runs (#51) |
 | `standards` (EN / ASHRAE / DIN tables) | `Standards.cs` | ✓ (#52) | — |
@@ -155,9 +155,10 @@ and `WENTASOUND` ship).
 WiX MSI (DLL + CUIX + registry + example catalog), semver, CI on a
 Windows+ZWCAD2021 runner (evidence-log assert + screenshot diff), crash
 discipline (no unhandled exception in ZWCAD, `wenta.log`), `WENTAHELP` ✓
-(command list; opens the Markdown guides, not HTML yet).
+(command list; opens the guides as HTML generated from the Markdown at build time).
 Docs ✓: EN/PL user guide (`docs/user-guide.{en,pl}.md`), catalog spec, and
-the library CI (`.github/workflows/csharp.yml`) — #37 less HTML help.
+the library CI (`.github/workflows/csharp.yml`), HTML help ✓ — #37 still
+needs the catalog JSON schema, a changelog, an architecture doc and the ZWCAD CI.
 The MSI (#36) needs WiX, which is not installed on the current machine.
 
 ## Phase 7 — 3D, clash, IFC (full-suite scope)

@@ -305,6 +305,10 @@ Finally it checks the round trip: `WENTAWRITE` draws the traced network at
 and the second `WENTAREAD` JSON is byte-identical to the first; with the
 point components erased `WENTAREAD` refuses with orphaned tags, and after
 lengthening one drawn duct by 1 m it reports one edit and 5.14 Pa.
+Last, `WENTAATTEN` (studio, 50 m², α 0.2, the example catalog) puts
+`ExampleAtten EA-200-1200` and `EA-200-600` in front of the two
+terminals, leaves no room over the limit and raises ΔP from 5.14 to
+6.84 Pa; `WENTAREAD` then reads 9 components and 6.84 Pa.
 
 ### 3.13 `WENTAFAN` — fan at the duty point
 
@@ -349,14 +353,18 @@ with the room equation, then checks the result against the space type's
 limit (`DrawingSound.Rooms`, §4.10). Rooms are listed worst first, the
 values go into the terminal markers' tags (`sound_lp_db`, `sound_nc_limit`,
 `sound_ok`), and the table is written to **`%TEMP%\wenta_sound.csv`**.
-Attenuator selection (`WENTAATTEN`) is not implemented yet.
+`WENTAATTEN` (§3.18) selects attenuators for the rooms over the limit.
 
 ### 3.16 `WENTAHELP` — command list and user guide
 
 Prints every command with a one-line description and the paths of the
 English and Polish user guides, which `install.ps1` copies next to the DLL.
 The prompt `Open the user guide [English/Polski/No] <No>` opens the chosen
-guide (a Markdown file) with the program Windows associates with `.md`.
+guide in the default web browser: an HTML page with a table of contents,
+generated from the Markdown guide when the plugin is built
+(`zwcad-plugin/tools/MakeHelp.cs`, `Wenta.Markdown`). If the HTML file is
+missing it falls back to the Markdown file and the program Windows
+associates with `.md`.
 
 ### 3.17 `WENTAWRITE` / `WENTAREAD` — network JSON ⇄ drawing
 
@@ -388,9 +396,36 @@ copied entity), a duplicated id, a class that does not match the type, a
 duct record on a point entity or the reverse, a missing value, an unknown
 port, or a network that does not validate. Up to 20 problems are listed.
 
-### 3.18 Ribbon tab "Wenta"
+### 3.18 `WENTAATTEN` — attenuators for rooms over their limit
 
-One panel with sixteen large buttons, each running one command:
+Reads the drawn network the way `WENTAREAD` does (every tagged entity in
+model space) and refuses, listing the problems, when the drawing does not
+validate. Prompts: space type
+`[studio/bedroom/office/classroom/retail/industrial]`, room surface area
+(m²), mean absorption coefficient α, and the attenuator catalog (default
+`example-attenuators.json` next to the DLL, §5.5). For every terminal it
+computes the room sound as `WENTASOUND` does, from the rigid run that feeds
+the terminal (through any two-port fittings) and minus any attenuator
+already on that run. For each room over the limit it picks, from the
+catalog entries of the feeding run's diameter (±0.5 mm), the one with the
+lowest ζ whose insertion loss covers the excess (the shorter unit on a
+tie), and splices it in front of the terminal as a two-port fitting
+`atten_<terminal>` with the catalog's ζ, GUID, catalog entry and
+provenance. The network is solved again and the new components are drawn
+(500 mm back along the run's last segment) with `WENTAWRITE`, so
+`WENTAREAD` reads them back. A room that no catalog entry can bring under
+the limit is reported, not changed. The table goes to
+**`%TEMP%\wenta_atten.csv`** and the updated network to
+**`%TEMP%\wenta_atten.json`**.
+
+The selection uses one single-number insertion loss per unit against the
+single-number room level of §4.10; there are no octave-band data,
+breakout or propagation along the ductwork, so treat it as a first check.
+The units in `example-attenuators.json` are invented.
+
+### 3.19 Ribbon tab "Wenta"
+
+One panel with seventeen large buttons, each running one command:
 
 | Button | Command |
 |---|---|
@@ -407,13 +442,14 @@ One panel with sixteen large buttons, each running one command:
 | Select Fan | `WENTAFAN` |
 | Insulate | `WENTAINSULATE` |
 | Room Sound | `WENTASOUND` |
+| Attenuators | `WENTAATTEN` |
 | Draw Network | `WENTAWRITE` |
 | Read Network | `WENTAREAD` |
 | Wenta Help | `WENTAHELP` |
 
-### 3.19 Roadmap
+### 3.20 Roadmap
 
-Commands such as `WENTAFITTING` and `WENTAATTEN`
+Commands such as `WENTAFITTING`
 are planned, not implemented; the library half of several of them already exists (see §4).
 The plan is in `zwcad-plugin/ROADMAP.md` and the GitHub issues of
 `ModelTok/wenta`.
@@ -758,6 +794,29 @@ Each fan has an `id` (unique in the file) and `points`, a list of
 first fan that meets the duty point, so list fans from smallest to largest.
 Load with `FanCatalog.Load(path)`. The four fans in `example-fans.json` are
 invented and only exercise the format.
+
+### 5.5 Attenuator catalog (`csharp/catalogs/example-attenuators.json`, version 1)
+
+```json
+{
+  "name": "example-attenuators",
+  "version": 1,
+  "description": "...",
+  "attenuators": [
+    { "id": "ExampleAtten EA-160-600", "diameter_mm": 160, "length_mm": 600,
+      "insertion_loss_db": 8.0, "zeta": 0.45, "source": "fictional example" }
+  ]
+}
+```
+
+Each attenuator has an `id` (unique in the file), the connection diameter
+`diameter_mm` and `length_mm` (both positive), a single-number
+`insertion_loss_db` (positive) and `zeta` (≥ 0, at the connection velocity).
+`source` and `notes` are free text; `source` ends up in the inserted
+component's provenance. A file with a `version` newer than 1 is refused.
+Load with `AttenuatorCatalog.Load(path)`. The 21 units in
+`example-attenuators.json` (Ø100–Ø315, 600/900/1200 mm) are invented and
+only exercise the format.
 
 ## 6. Troubleshooting
 

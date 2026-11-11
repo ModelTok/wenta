@@ -1,0 +1,28 @@
+{
+  "name": "example-attenuators",
+  "version": 1,
+  "description": "Fictional round in-line attenuators (connection diameter, length, single-number insertion loss, zeta at the connection velocity) to exercise the attenuator catalog format and WENTAATTEN. Every number is invented; replace them with manufacturer data before selecting a real attenuator.",
+  "attenuators": [
+    {"id": "ExampleAtten EA-100-600", "diameter_mm": 100, "length_mm": 600, "insertion_loss_db": 9.0, "zeta": 0.45, "source": "fictional example"},
+    {"id": "ExampleAtten EA-100-900", "diameter_mm": 100, "length_mm": 900, "insertion_loss_db": 13.5, "zeta": 0.6, "source": "fictional example"},
+    {"id": "ExampleAtten EA-100-1200", "diameter_mm": 100, "length_mm": 1200, "insertion_loss_db": 18.0, "zeta": 0.8, "source": "fictional example"},
+    {"id": "ExampleAtten EA-125-600", "diameter_mm": 125, "length_mm": 600, "insertion_loss_db": 8.5, "zeta": 0.45, "source": "fictional example"},
+    {"id": "ExampleAtten EA-125-900", "diameter_mm": 125, "length_mm": 900, "insertion_loss_db": 12.8, "zeta": 0.6, "source": "fictional example"},
+    {"id": "ExampleAtten EA-125-1200", "diameter_mm": 125, "length_mm": 1200, "insertion_loss_db": 17.0, "zeta": 0.8, "source": "fictional example"},
+    {"id": "ExampleAtten EA-150-600", "diameter_mm": 150, "length_mm": 600, "insertion_loss_db": 8.0, "zeta": 0.45, "source": "fictional example"},
+    {"id": "ExampleAtten EA-150-900", "diameter_mm": 150, "length_mm": 900, "insertion_loss_db": 12.0, "zeta": 0.6, "source": "fictional example"},
+    {"id": "ExampleAtten EA-150-1200", "diameter_mm": 150, "length_mm": 1200, "insertion_loss_db": 16.0, "zeta": 0.8, "source": "fictional example"},
+    {"id": "ExampleAtten EA-160-600", "diameter_mm": 160, "length_mm": 600, "insertion_loss_db": 8.0, "zeta": 0.45, "source": "fictional example"},
+    {"id": "ExampleAtten EA-160-900", "diameter_mm": 160, "length_mm": 900, "insertion_loss_db": 12.0, "zeta": 0.6, "source": "fictional example"},
+    {"id": "ExampleAtten EA-160-1200", "diameter_mm": 160, "length_mm": 1200, "insertion_loss_db": 16.0, "zeta": 0.8, "source": "fictional example"},
+    {"id": "ExampleAtten EA-200-600", "diameter_mm": 200, "length_mm": 600, "insertion_loss_db": 7.0, "zeta": 0.45, "source": "fictional example"},
+    {"id": "ExampleAtten EA-200-900", "diameter_mm": 200, "length_mm": 900, "insertion_loss_db": 10.5, "zeta": 0.6, "source": "fictional example"},
+    {"id": "ExampleAtten EA-200-1200", "diameter_mm": 200, "length_mm": 1200, "insertion_loss_db": 14.0, "zeta": 0.8, "source": "fictional example"},
+    {"id": "ExampleAtten EA-250-600", "diameter_mm": 250, "length_mm": 600, "insertion_loss_db": 6.0, "zeta": 0.45, "source": "fictional example"},
+    {"id": "ExampleAtten EA-250-900", "diameter_mm": 250, "length_mm": 900, "insertion_loss_db": 9.0, "zeta": 0.6, "source": "fictional example"},
+    {"id": "ExampleAtten EA-250-1200", "diameter_mm": 250, "length_mm": 1200, "insertion_loss_db": 12.0, "zeta": 0.8, "source": "fictional example"},
+    {"id": "ExampleAtten EA-315-600", "diameter_mm": 315, "length_mm": 600, "insertion_loss_db": 5.0, "zeta": 0.45, "source": "fictional example"},
+    {"id": "ExampleAtten EA-315-900", "diameter_mm": 315, "length_mm": 900, "insertion_loss_db": 7.5, "zeta": 0.6, "source": "fictional example"},
+    {"id": "ExampleAtten EA-315-1200", "diameter_mm": 315, "length_mm": 1200, "insertion_loss_db": 10.0, "zeta": 0.8, "source": "fictional example"}
+  ]
+}

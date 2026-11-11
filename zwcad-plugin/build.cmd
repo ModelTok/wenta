@@ -82,14 +82,31 @@ if not exist "%OUT%" mkdir "%OUT%"
   "%CORE%\QuickConnect.cs" ^
   "%CORE%\DrawingModel.cs" ^
   "%CORE%\FanCatalog.cs" ^
-  "%CORE%\NetworkDrawing.cs"
+  "%CORE%\NetworkDrawing.cs" ^
+  "%CORE%\Attenuators.cs" ^
+  "%CORE%\Markdown.cs"
 
 if errorlevel 1 ( echo BUILD FAILED & exit /b 1 )
 
 copy /y "%REPO%\csharp\catalogs\example-generic.json" "%OUT%" >nul
 copy /y "%REPO%\csharp\catalogs\example-fans.json" "%OUT%" >nul
+copy /y "%REPO%\csharp\catalogs\example-attenuators.json" "%OUT%" >nul
 copy /y "%REPO%\docs\user-guide.en.md" "%OUT%" >nul
 copy /y "%REPO%\docs\user-guide.pl.md" "%OUT%" >nul
+
+rem ---- MakeHelp.exe: the user guides as HTML for WENTAHELP (#37) ----
+%CSC% ^
+  -nologo -target:exe -platform:anycpu -optimize+ -deterministic ^
+  -out:"%OUT%\MakeHelp.exe" ^
+  -r:"%FW%\System.dll" ^
+  -r:"%FW%\System.Core.dll" ^
+  "%~dp0tools\MakeHelp.cs" ^
+  "%CORE%\Markdown.cs"
+if errorlevel 1 ( echo BUILD FAILED: MakeHelp & exit /b 1 )
+"%OUT%\MakeHelp.exe" "%REPO%\docs\user-guide.en.md" "%OUT%\user-guide.en.html" en
+if errorlevel 1 ( echo BUILD FAILED: user-guide.en.html & exit /b 1 )
+"%OUT%\MakeHelp.exe" "%REPO%\docs\user-guide.pl.md" "%OUT%\user-guide.pl.html" pl
+if errorlevel 1 ( echo BUILD FAILED: user-guide.pl.html & exit /b 1 )
 
 rem ---- MakeCuix.exe (CUIX ribbon package builder) -> Wenta.CUIX ----
 %CSC% ^
@@ -103,5 +120,5 @@ if errorlevel 1 ( echo BUILD FAILED: MakeCuix & exit /b 1 )
 "%OUT%\MakeCuix.exe" "%OUT%"
 if errorlevel 1 ( echo BUILD FAILED: Wenta.CUIX & exit /b 1 )
 
-echo BUILD OK: %OUT%\WentaZwcad.dll  (+ example-generic.json, example-fans.json, user guides)
+echo BUILD OK: %OUT%\WentaZwcad.dll  (+ example-generic.json, example-fans.json, example-attenuators.json, user guides)
 endlocal
