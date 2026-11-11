@@ -16,6 +16,9 @@ zwcad-plugin/              WentaZwcad — ZWCAD 2021 plugin, CUIX ribbon, ROADMA
 
 ## Quick start
 
+Rules for changes, conventions and the session close-out step are in
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ```cmd
 just csharp-parity      # build Wenta.Core + run the whole test suite
 just zwcad-build        # WentaZwcad.dll + Wenta.CUIX (needs the ZWCAD 2021 SDK)
